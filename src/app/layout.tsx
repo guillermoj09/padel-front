@@ -1,5 +1,8 @@
 // app/layout.tsx
 import '../styles/globals.css';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import 'react-calendar/dist/Calendar.css'
+
 
 export const metadata = {
   title: 'Test Modal',

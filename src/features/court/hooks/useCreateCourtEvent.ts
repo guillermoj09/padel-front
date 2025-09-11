@@ -28,7 +28,7 @@ export const useCreateCourtEvent = () => {
   const saveEventToBackend = async (courtId: string, booking: Booking) => {
     setLoading(true);
     setError(null);
-
+    
     try {
       const savedBooking = await createBooking(courtId, booking);  // Llamada a la API para crear la reserva
       return savedBooking;

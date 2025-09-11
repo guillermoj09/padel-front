@@ -1,6 +1,5 @@
 'use client';
 
-
 import Link from 'next/link';
 
 export default function HomePage() {
@@ -16,23 +15,19 @@ export default function HomePage() {
         <p className="text-lg mb-6">Elige una cancha para ver su calendario y reservar horarios.</p>
 
         <div className="flex flex-col md:flex-row gap-4 justify-center">
-          <Link
-            href="/court/1"
-            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white"
-          >
+          <Link href="/court/1" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white">
             Ver Cancha Padel 1
           </Link>
-          <Link
-            href="/court/2"
-            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white"
-          >
+          <Link href="/court/2" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white">
             Ver Cancha Padel 2
           </Link>
-          <Link
-            href="/court/3"
-            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white"
-          >
+          <Link href="/court/3" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white">
             Ver Cancha Padel 3
+          </Link>
+
+          {/* NUEVO: botón para ver el calendario general (CanchaCalendar) */}
+          <Link href="/canchas" className="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded text-white">
+            Ver Calendario General
           </Link>
         </div>
       </div>

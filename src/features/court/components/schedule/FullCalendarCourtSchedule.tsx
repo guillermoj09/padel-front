@@ -25,21 +25,38 @@ export default function FullCalendarCourtSchedule({ courtId }: Props) {
 
   const { fetchEvents } = useFetchCourtEvents();
 
-  const loadCourtEvents = async (fetchInfo: any, successCallback: any, failureCallback: any) => {
-   try {
-    const data = await fetchEvents(courtId, fetchInfo.startStr, fetchInfo.endStr);
+const loadCourtEvents = async (
+  fetchInfo: { startStr: string; endStr: string },
+  successCallback: (events: any[]) => void,
+  failureCallback: (error: any) => void
+) => {
+  try {
+    const bookings = await fetchEvents(
+      courtId,
+      fetchInfo.startStr,
+      fetchInfo.endStr
+    );
 
-    if (!Array.isArray(data)) {
-      console.warn("⚠️ fetchEvents no devolvió un array. Se usará []");
+    if (!Array.isArray(bookings)) {
       return successCallback([]);
     }
-    console.log("✅ Eventos a mostrar:", data);
-    successCallback(data);
+
+    // --- Aquí transformas Booking[] a EventInput[] ---
+    const events = bookings.map(b => ({
+      id:    b.id,
+      title: `Reserva (${b.status})`, // o simplemente b.status
+      start: b.startTime,             // usa startTime
+      end:   b.endTime                // usa endTime
+    }));
+
+    console.log("✅ Eventos transformados:", events);
+    successCallback(events);
   } catch (err) {
     console.error("❌ Error cargando eventos:", err);
     failureCallback(err);
   }
 };
+
 
 
 
@@ -59,8 +76,8 @@ export default function FullCalendarCourtSchedule({ courtId }: Props) {
     const newEvent = {
       id: nanoid(),
       title,
-      start: slotInfo.start,
-      end: slotInfo.end,
+      startTime: slotInfo.start,
+      endTime: slotInfo.end,
       courtId,
     };
 
@@ -103,3 +120,4 @@ export default function FullCalendarCourtSchedule({ courtId }: Props) {
     </>
   );
 }
+*/

@@ -11,7 +11,7 @@ type CourtScheduleState = {
   setEventsByCourt: (courtId: string, events: Booking[]) => void;
 };
 
-console.log("entro");
+//console.log("entro");
 
 export const useCourtSchedule = create(
   persist<CourtScheduleState>(
