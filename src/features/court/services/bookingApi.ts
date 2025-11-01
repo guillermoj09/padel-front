@@ -2,9 +2,7 @@
 import { mockCourtEvents } from '../mocks/court/courtEvent.mock';
 import { USE_MOCKS } from '@/config/env';
 import { Booking } from '../types/booking';
-
-
-
+import { apiFetch } from '@/lib/api';     // <- sin "auth"
 
 export async function getCourtEvents(
   courtId: string,
@@ -12,52 +10,52 @@ export async function getCourtEvents(
   end: string
 ): Promise<Booking[]> {
   if (USE_MOCKS) {
-    console.log('[MOCK] getCourtEvents', courtId, start, end)
-    return mockCourtEvents[courtId] || []
+    console.log('[MOCK] getCourtEvents', courtId, start, end);
+    return mockCourtEvents[courtId] || [];
   }
 
-  const url = `http://localhost:3002/bookings/court/${courtId}/events` +
-              `?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
-
-  //console.log('Fetching events from', url)
-  const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) {
-    const text = await res.text()
-    console.error('Error fetching court events:', res.status, text)
-    throw new Error(`Error fetching events (${res.status})`)
-  }
-
-  const data: Booking[] = await res.json()
-  //console.log('Received bookings:', data)
-  return data
+  const params = new URLSearchParams({ start, end }).toString();
+  return apiFetch<Booking[]>(
+    `/bookings/court/${encodeURIComponent(courtId)}/events?${params}`,
+    { noStore: true } // fuerza fresh si quieres
+  );
 }
 
-export async function createBooking(courtId: string, booking: Booking): Promise<Booking> {
-  console.log("entra ?");
-  
+export async function createBooking(booking: Booking): Promise<Booking> {
   if (USE_MOCKS) {
-    // Simular delay de red
     await new Promise((r) => setTimeout(r, 300));
     mockCourtEvents[courtId] = [...(mockCourtEvents[courtId] || []), booking];
     return booking;
   }
-  console.log(` booking antes ${booking.endTime}`)
+  console.log('entro');
+
+  // NO mandamos userId. El backend debe usar req.user.id desde la cookie/JWT.
   const body = {
-    userId: 'b2a8536d-7d7d-4c87-93ae-1813b1651000',  // ID de usuario, reemplázalo si es dinámico
-    courtId: Number(courtId),  // Convierte courtId a número si es necesario
+    courtId: Number(booking.courtId),
     startTime: booking.startTime,
     endTime: booking.endTime,
-    date: booking.startTime.split('T')[0],  // Extraer la fecha del campo start
-    status: 'pendiente',  // Establecer estado
+    //date: booking.startTime.split('T')[0],
+    //status: 'pendiente',
   };
   console.log(body);
-  const res = await fetch(`http://localhost:3002/bookings`, {  // Cambiar la ruta a /bookings
+  return apiFetch<Booking>('/bookings', {
     method: 'POST',
-    body: JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json' },
+    jsonBody: body, // <- usa jsonBody, no body: JSON.stringify(...)
   });
-
-  if (!res.ok) throw new Error('Error creating booking');
-  return res.json();
 }
 
+export async function cancelBooking(
+  bookingId: string,
+  opts?: { reason?: string; }
+): Promise<{ success: true }> {
+  const { reason } = opts || {};
+
+  await apiFetch(`/bookings/${bookingId}/cancel`, {
+    method: 'PATCH',
+    jsonBody: {
+      ...(reason ? { reason } : {}),
+    },
+  });
+
+  return { success: true };
+}

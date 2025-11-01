@@ -1,45 +1,66 @@
-// src/hooks/useEvent.ts
-import { useState } from 'react';
-import { getCourtEvents, createBooking } from '@/features/court/services/bookingApi';  // Importar las funciones
-import { Booking } from '../types/booking';
+// src/hooks/useCreateCourtEvent.ts
+import { useCallback, useState } from 'react';
+import { createBooking } from '@/features/court/services/bookingApi';
+import type { Booking } from '@/features/court/types/booking';
 
-export const useCreateCourtEvent = () => {
+/**
+ * Parámetros para crear una reserva.
+ * Usa Date en local; el hook normaliza a ISO UTC para el backend.
+ */
+export type CreateEventParams = {
+  courtId: string | number;
+  start: Date;
+  end: Date;
+  title?: string;
+  notes?: string;
+};
+
+export type UseCreateCourtEventReturn = {
+  createEvent: (params: CreateEventParams) => Promise<Booking | null>;
+  loading: boolean;
+  error: string | null;
+  resetError: () => void;
+};
+
+/**
+ * Hook minimalista para CREAR reservas de cancha.
+ * No trae eventos; solo realiza el POST y expone loading/error.
+ */
+export const useCreateCourtEvent = (): UseCreateCourtEventReturn => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Obtener los eventos de la cancha
-  const fetchEvents = async (courtId: string) => {
+  const resetError = useCallback(() => setError(null), []);
+
+  const createEvent = useCallback(async (params: CreateEventParams) => {
+    const { courtId, start, end, title, notes } = params;
     setLoading(true);
     setError(null);
-
     try {
-      const events = await getCourtEvents(courtId);  // Llamada a la API para obtener eventos
-      return events;
-    } catch (err) {
-      setError('Error al obtener eventos');
-      console.error(err);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Guardar la reserva en el backend
-  const saveEventToBackend = async (courtId: string, booking: Booking) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const savedBooking = await createBooking(courtId, booking);  // Llamada a la API para crear la reserva
-      return savedBooking;
-    } catch (err) {
-      setError('Error al crear la reserva');
-      console.error(err);
+      const payload = {
+        courtId: Number(courtId),
+        startTime: start.toISOString(), // normaliza a ISO (UTC)
+        endTime: end.toISOString(),
+        title,
+        notes,
+      };
+      console.log(payload)
+      // Ajusta si tu API espera otra firma
+      const saved = await createBooking(payload);
+      return saved as Booking;
+    } catch (e: any) {
+      // Si tu API devuelve 409 en solapes, puedes mapear un mensaje claro:
+      const status = e?.status ?? e?.response?.status;
+      if (status === 409) {
+        setError('Ya existe una reserva que se superpone con ese horario.');
+      } else {
+        setError(e?.message || 'Error al crear la reserva.');
+      }
       return null;
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  return { fetchEvents, saveEventToBackend, loading, error };
+  return { createEvent, loading, error, resetError };
 };

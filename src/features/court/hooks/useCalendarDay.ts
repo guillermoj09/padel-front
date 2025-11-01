@@ -8,7 +8,7 @@ export interface CalendarEvent {
   start: Date;
   end: Date;
   resourceId: string;
-  estado: 'reservado' | 'confirmado';
+  estado: 'pending';
 }
 
 export function useCalendarDay(params: { date: Date; source?: DataSource; maxCourts?: number }) {
