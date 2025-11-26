@@ -27,13 +27,12 @@ export async function createBooking(booking: Booking): Promise<Booking> {
     mockCourtEvents[courtId] = [...(mockCourtEvents[courtId] || []), booking];
     return booking;
   }
-  console.log('entro');
-
   // NO mandamos userId. El backend debe usar req.user.id desde la cookie/JWT.
   const body = {
     courtId: Number(booking.courtId),
     startTime: booking.startTime,
     endTime: booking.endTime,
+    title: booking.title
     //date: booking.startTime.split('T')[0],
     //status: 'pendiente',
   };

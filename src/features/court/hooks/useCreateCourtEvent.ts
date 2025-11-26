@@ -44,7 +44,7 @@ export const useCreateCourtEvent = (): UseCreateCourtEventReturn => {
         title,
         notes,
       };
-      console.log(payload)
+      console.log(`payload ${payload}`)
       // Ajusta si tu API espera otra firma
       const saved = await createBooking(payload);
       return saved as Booking;

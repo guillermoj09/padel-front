@@ -7,4 +7,5 @@ export interface Booking {
   endTime:   string  // ISO string
   status:    string
   date:      string  // YYYY-MM-DD
+  title: string
 }
