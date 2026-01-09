@@ -14,7 +14,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="es">
       <body>
-        <UserProvider user={user}>
+        <UserProvider>
           <TopBar />
           {children}
         </UserProvider>

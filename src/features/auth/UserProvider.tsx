@@ -1,11 +1,21 @@
 'use client';
-import { createContext, useContext, useMemo } from 'react';
-import type { CurrentUser } from '@/app/(auth)/server/session';
 
-const Ctx = createContext<CurrentUser | null>(null);
+import { createContext, useContext } from 'react';
+import { useSession } from '@/features/auth/hooks/useSession';
 
-export function UserProvider({ user, children }: { user: CurrentUser | null; children: React.ReactNode }) {
-  const value = useMemo(() => user, [user?.sub, user?.email, user?.name, JSON.stringify(user?.roles ?? [])]);
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+// El contexto solo guarda EL USUARIO, no un objeto grande
+const UserContext = createContext<any>(null);
+
+export function UserProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useSession();
+    console.log("UserProvider → user:", user); // 👈 agregar aquí
+  return (
+    <UserContext.Provider value={user}>
+      {children}
+    </UserContext.Provider>
+  );
 }
-export function useUser() { return useContext(Ctx); }
+
+export function useUser() {
+  return useContext(UserContext);
+}

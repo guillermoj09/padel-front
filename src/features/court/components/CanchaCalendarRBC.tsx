@@ -17,8 +17,9 @@ import { ReserveModal } from '@/features/court/components/ReserveModal';
 import { useCreateCourtEvent } from '@/features/court/hooks/useCreateCourtEvent';
 import { CancelModal } from '@/features/court/components/CancelModal';
 import { useCancelCourtEvent } from '@/features/court/hooks/useCancelCourtEvent';
+import { ReservationInfoModal } from '@/features/court/components/ReservationInfoModal';
 
-// --- Localizador RBC + date-fns (ES) ---
+// ---- Localizador ---
 const locales = { es };
 const localizer = dateFnsLocalizer({
   format,
@@ -27,8 +28,7 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales,
 });
-
-// --- "Hoy" anclado a zona horaria para evitar desfaces TZ/DST ---
+// ---- Fecha inicial ---
 function todayInTimeZone(tz: string) {
   const now = new Date();
   const parts = new Intl.DateTimeFormat('es-CL', {
@@ -46,7 +46,8 @@ function todayInTimeZone(tz: string) {
 
 const FECHA_INICIAL = todayInTimeZone('America/Santiago');
 
-// --- Colores por estado ---
+
+// ---- Estados visuales eventos ---
 function eventPropGetter(event: CalendarEvent) {
   const base: React.CSSProperties = {
     borderRadius: 10,
@@ -54,23 +55,53 @@ function eventPropGetter(event: CalendarEvent) {
     color: '#111827',
     fontWeight: 600,
   };
+
   const bg =
     event.estado === 'confirmado'
-      ? '#bbf7d0' // verde suave
+      ? '#bbf7d0'
       : event.estado === 'reservado' || event.estado === 'pending'
-        ? '#fecaca' // rojo suave
-        : '#e5e7eb'; // gris
+        ? '#fecaca'
+        : '#e5e7eb';
+
   return { style: { ...base, backgroundColor: bg } };
 }
 
 type Props = { dataSource?: DataSource };
+const CANCELABLE_STATES = new Set(['pending', 'reserved', 'confirmed']);
 
-// Estados que se pueden cancelar desde la grilla
-const CANCELABLE_STATES = new Set(['pending', 'reservado']);
+// ==========================
+//  HORARIOS PERMITIDOS
+// ==========================
+
+// intervalos válidos para 1h30
+const ALLOWED_SLOTS = [
+  { h: 7, m: 0 },
+  { h: 8, m: 30 },
+  { h: 10, m: 0 },
+  { h: 11, m: 30 },
+  { h: 17, m: 0 },
+  { h: 18, m: 30 },
+  { h: 20, m: 0 },
+  { h: 21, m: 30 },
+];
+
+// helper: sumar minutos
+const addMinutes = (date: Date, minutes: number) =>
+  new Date(date.getTime() + minutes * 60 * 1000);
+
+const RESERVATION_MINUTES = 90; // 1h 30m
+
+
+// ==========================
+//      COMPONENTE
+// ==========================
 
 export default function CanchaCalendarRBC({ dataSource }: Props) {
   const [view, setView] = useState(Views.DAY);
   const [date, setDate] = useState<Date>(FECHA_INICIAL);
+
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   const { courts, eventsAll, loading, error } = useCalendarDay({
     date,
@@ -81,35 +112,33 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
   const {
     createEvent,
     loading: savingEvent,
-    error: saveError,
   } = useCreateCourtEvent();
 
   const {
     cancelEvent,
     loading: canceling,
-    error: cancelError,
   } = useCancelCourtEvent();
 
-  // canchas visibles (ids seleccionados)
+
+  // selección de canchas visibles
   const [selected, setSelected] = useState<string[]>([]);
   const [bootstrapped, setBootstrapped] = useState(false);
 
-  // reservas creadas desde el front (aún no sincronizadas)
+  // eventos locales + cancelados
   const [confirmed, setConfirmed] = useState<CalendarEvent[]>([]);
-  // ids cancelados (para ocultar en vista)
   const [canceledIds, setCanceledIds] = useState<Set<string>>(new Set());
 
-  // modal crear
+  // modales
   const [isOpen, setIsOpen] = useState(false);
-  const [slotStart, setSlotStart] = useState<Date | undefined>(undefined);
-  const [slotEnd, setSlotEnd] = useState<Date | undefined>(undefined);
-  const [slotResourceId, setSlotResourceId] = useState<string | undefined>(undefined);
+  const [slotStart, setSlotStart] = useState<Date | undefined>();
+  const [slotEnd, setSlotEnd] = useState<Date | undefined>();
+  const [slotResourceId, setSlotResourceId] = useState<string | undefined>();
 
-  // modal cancelar
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [eventToCancel, setEventToCancel] = useState<CalendarEvent | null>(null);
 
-  // seleccionar primeras 3 canchas una sola vez
+
+  // seleccionar primeras 3 canchas
   useEffect(() => {
     if (!bootstrapped && courts.length) {
       setSelected(courts.slice(0, 3).map((c) => c.id));
@@ -117,13 +146,14 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
     }
   }, [courts, bootstrapped]);
 
-  // recursos visibles para RBC
+
   const resources = useMemo(
     () => courts.filter((r) => selected.includes(r.id)),
     [courts, selected]
   );
 
-  // combinar eventos backend + creados localmente, filtrando cancelados
+
+  // combinar eventos backend + locales
   const events = useMemo(() => {
     const cancelFilter = (e: CalendarEvent) =>
       !canceledIds.has(String(e.id)) && selected.includes(e.resourceId);
@@ -134,66 +164,61 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
     ];
   }, [eventsAll, confirmed, canceledIds, selected]);
 
-  // limpieza: si un "confirmado local" ya llegó desde backend, quitarlo de local
+
+  // limpiar eventos locales ya sincronizados
   useEffect(() => {
     setConfirmed((prev) =>
       prev.filter((c) => !eventsAll.some((e) => String(e.id) === String(c.id)))
     );
   }, [eventsAll]);
 
-  // ancho mínimo de grilla según cantidad de recursos
-  const minWidthPx = useMemo(
-    () => Math.max(900, resources.length * 220),
-    [resources.length]
-  );
 
-  // bloquear selección de slots en días pasados
+  // bloquear días pasados
   const isSameOrAfterToday = (d: Date) => {
     const cmp = new Date(d);
     cmp.setHours(0, 0, 0, 0);
+
     const limit = new Date(FECHA_INICIAL);
     limit.setHours(0, 0, 0, 0);
+
     return cmp >= limit;
   };
-  const RESERVATION_MINUTES = 90; // 1h 30min
 
 
-  // selección de slot para crear
-const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
-  // si el start es de un día pasado, ignorar
-  if (!isSameOrAfterToday(info.start)) return;
+  // ==========================
+  //   BLOQUEAR HORAS NO VÁLIDAS
+  // ==========================
 
-  // calculamos siempre 1h30 a partir del inicio
-  const start = info.start;
-  const end = addMinutes(start, RESERVATION_MINUTES);
-
-  // (opcional) evitar reservas que se salgan del horario máximo (23:00)
-  const closing = new Date(start);
-  closing.setHours(23, 0, 0, 0);
-  if (end > closing) {
-    // aquí podrías mostrar un toast de “no se puede reservar más tarde”
-    return;
-  }
-
-  setSlotStart(start);
-  setSlotEnd(end);
-
-  const rid = info.resourceId ?? resources?.[0]?.id;
-  setSlotResourceId(rid ? String(rid) : undefined);
-  setIsOpen(true);
-};
-  function addMinutes(date: Date, minutes: number) {
-  return new Date(date.getTime() + minutes * 60 * 1000);
-}
-
-  const closeModal = () => {
-    setIsOpen(false);
-    setSlotStart(undefined);
-    setSlotEnd(undefined);
-    setSlotResourceId(undefined);
+  const isAllowedTime = (d: Date) => {
+    const h = d.getHours();
+    const m = d.getMinutes();
+    return ALLOWED_SLOTS.some(t => t.h === h && t.m === m);
   };
 
-  // guardar nueva reserva
+
+  // selección de slot
+  const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
+    if (!isSameOrAfterToday(info.start)) return;
+
+    // solo horarios válidos
+    if (!isAllowedTime(info.start)) return;
+
+    const start = info.start;
+    const end = addMinutes(start, RESERVATION_MINUTES);
+
+    // cierre máximo 23:00
+    const closing = new Date(start);
+    closing.setHours(23, 0, 0, 0);
+    if (end > closing) return;
+
+    setSlotStart(start);
+    setSlotEnd(end);
+    setSlotResourceId(info.resourceId ?? resources?.[0]?.id);
+    setIsOpen(true);
+  };
+
+
+  // guardar reserva
   const handleSaveBooking = async ({
     title,
     courtId,
@@ -207,51 +232,49 @@ const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
     end: Date;
     notes?: string;
   }) => {
-    try {
-      const saved = await createEvent({
-        courtId,
-        start,
-        end,
-        title,
-        notes,
-      });
 
-      if (saved) {
-        const savedEvt: CalendarEvent = {
+    const saved = await createEvent({
+      courtId,
+      start,
+      end,
+      title,
+      notes,
+    });
+
+    if (saved) {
+      setConfirmed((prev) => [
+        ...prev,
+        {
           id: String(saved.id),
           title: saved.title ?? title,
           start: new Date(saved.startTime ?? start),
           end: new Date(saved.endTime ?? end),
           resourceId: String(saved.courtId ?? courtId),
           estado: (saved.estado ?? saved.status ?? 'confirmado') as CalendarEvent['estado'],
-        };
-        setConfirmed((prev) => [...prev, savedEvt]);
-        closeModal();
-        return;
-      }
+        },
+      ]);
 
-      console.warn('No se guardó la reserva', saveError);
-    } catch (e) {
-      console.error('Error guardando la reserva', e);
+      setIsOpen(false);
+      setSlotStart(undefined);
+      setSlotEnd(undefined);
+      setSlotResourceId(undefined);
     }
   };
 
-  // click en evento → abrir modal de cancelar (si es cancelable)
+
+  // cancelar evento
   const handleSelectEvent = (ev: CalendarEvent) => {
-    if (!CANCELABLE_STATES.has(ev.estado)) return;
-    setEventToCancel(ev);
-    setIsCancelOpen(true);
+    console.log("le di click");
+    setSelectedEvent(ev);
+    setIsInfoOpen(true);
   };
 
-  // confirmar cancelación en modal
+
+
   const handleConfirmCancel = async (reason?: string) => {
     if (!eventToCancel) return;
 
-    const ok = await cancelEvent({
-      id: String(eventToCancel.id),
-      reason,
-    });
-
+    const ok = await cancelEvent({ id: String(eventToCancel.id), reason });
     if (!ok) return;
 
     setCanceledIds((prev) => {
@@ -259,57 +282,55 @@ const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
       next.add(String(eventToCancel.id));
       return next;
     });
+
     setConfirmed((prev) =>
       prev.filter((e) => String(e.id) !== String(eventToCancel.id))
     );
+
     setIsCancelOpen(false);
     setEventToCancel(null);
   };
+  const handleAskDeleteFromInfo = () => {
+    if (!selectedEvent) return;
+    if (!CANCELABLE_STATES.has(selectedEvent.estado)) return;
 
-  const toggle = (id: string) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setEventToCancel(selectedEvent);
+    setIsCancelOpen(true);
+    setIsInfoOpen(false); // opcional
   };
 
+
+  // grid tamaño
+  const minWidthPx = useMemo(
+    () => Math.max(900, resources.length * 220),
+    [resources.length]
+  );
+
+
   const formattedDate = format(date, "EEEE d 'de' MMMM yyyy", { locale: es });
+
 
   return (
     <div className="h-[80vh] font-[system-ui]">
       <div className="h-full rounded-2xl bg-white shadow-sm border border-zinc-200 flex flex-col">
-        {/* Header superior */}
+
+        {/* ----- ENCABEZADO ----- */}
         <header className="flex items-center justify-between px-5 py-3 border-b border-zinc-200">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">
-              Calendario de reservas
-            </h1>
+            <h1 className="text-lg font-semibold">Calendario de reservas</h1>
             <p className="text-xs text-zinc-500">
               {formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1)}
             </p>
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 text-xs">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-3 w-3 rounded-full bg-green-200 border border-green-300" />
-                Confirmado
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-3 w-3 rounded-full bg-red-200 border border-red-300" />
-                Reservado / pendiente
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-3 w-3 rounded-full bg-gray-200 border border-gray-300" />
-                Otro
-              </span>
-            </div>
-          </div>
         </header>
 
-        {/* Contenido principal */}
+
+        {/* ----- CONTENIDO ----- */}
         <div className="flex-1 grid grid-cols-[260px,1fr] gap-4 p-4 overflow-hidden">
-          {/* Sidebar izquierda */}
+
+          {/* ------ Sidebar izquierda ------- */}
           <aside className="h-full flex flex-col gap-3">
+
             <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-2">
               <Calendar
                 locale="es"
@@ -326,88 +347,51 @@ const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
             </div>
 
             <div className="rounded-xl border border-zinc-200 bg-white p-3 flex-1 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-zinc-700">
-                  Canchas visibles
-                </span>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setSelected(courts.map((r) => r.id))}
-                    disabled={!courts.length}
-                    className="px-2 py-1 rounded-lg text-[11px] border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 disabled:opacity-40"
-                  >
-                    Todas
-                  </button>
-                  <button
-                    onClick={() => setSelected([])}
-                    disabled={!courts.length}
-                    className="px-2 py-1 rounded-lg text-[11px] border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 disabled:opacity-40"
-                  >
-                    Ninguna
-                  </button>
-                </div>
+              <span className="text-xs font-medium text-zinc-700">Canchas visibles</span>
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setSelected(courts.map(r => r.id))}
+                  className="px-2 py-1 text-xs border rounded bg-zinc-50"
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => setSelected([])}
+                  className="px-2 py-1 text-xs border rounded bg-zinc-50"
+                >
+                  Ninguna
+                </button>
               </div>
 
-              {loading && (
-                <div className="text-xs text-zinc-500">Cargando canchas…</div>
-              )}
-              {error && (
-                <div className="text-xs text-red-600">
-                  Error cargando canchas: {error}
-                </div>
-              )}
-              {cancelError && (
-                <div className="text-[11px] text-red-600">
-                  Error al cancelar: {String(cancelError)}
-                </div>
-              )}
-
-              <div className="flex-1 overflow-auto space-y-1.5 pr-1">
+              <div className="flex-1 overflow-auto">
                 {courts.map((r) => (
-                  <label
-                    key={r.id}
-                    className="flex items-center gap-2 text-xs text-zinc-700 cursor-pointer"
-                  >
+                  <label key={r.id} className="flex items-center gap-1 text-xs cursor-pointer">
                     <input
                       type="checkbox"
                       checked={selected.includes(r.id)}
-                      onChange={() => toggle(r.id)}
-                      className="accent-black"
+                      onChange={() => {
+                        setSelected(prev =>
+                          prev.includes(r.id)
+                            ? prev.filter(x => x !== r.id)
+                            : [...prev, r.id]
+                        );
+                      }}
                     />
-                    <span className="truncate">{r.title}</span>
+                    <span>{r.title}</span>
                   </label>
                 ))}
               </div>
 
-              <div className="border-t border-zinc-200 pt-2 mt-1">
-                <div className="text-xs font-medium text-zinc-700 mb-1">
-                  Reservas del día
-                </div>
-                {!loading && events.length === 0 && (
-                  <div className="text-[11px] text-zinc-500">
-                    Sin reservas para esta fecha.
-                  </div>
-                )}
-                <ul className="text-[11px] text-zinc-700 space-y-1 max-h-32 overflow-auto pr-1">
-                  {events.map((ev) => (
-                    <li key={ev.id} className="flex justify-between gap-2">
-                      <span className="tabular-nums">
-                        {format(ev.start, 'HH:mm')}–{format(ev.end, 'HH:mm')}
-                      </span>
-                      <span className="truncate flex-1 text-right">
-                        {ev.title} · {ev.resourceId}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
           </aside>
 
-          {/* Calendario principal */}
+
+          {/* ------ Calendario principal ------- */}
           <section className="h-full overflow-hidden rounded-xl border border-zinc-200 bg-white">
             <div className="h-full overflow-x-auto">
               <div style={{ minWidth: minWidthPx }}>
+
                 <RBCalendar
                   localizer={localizer}
                   culture="es"
@@ -415,31 +399,59 @@ const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
                   onNavigate={(next) => {
                     setDate(next < FECHA_INICIAL ? FECHA_INICIAL : next);
                   }}
+
                   view={view}
                   onView={setView}
                   defaultView={Views.DAY}
                   views={[Views.DAY, Views.WEEK]}
+
                   step={30}
                   timeslots={1}
+
                   min={new Date(1970, 0, 1, 7)}
                   max={new Date(1970, 0, 1, 23)}
+
                   events={events}
                   eventPropGetter={eventPropGetter}
+
                   resources={resources}
                   resourceIdAccessor="id"
                   resourceTitleAccessor="title"
+
                   selectable
-                  onSelecting={(range) => isSameOrAfterToday(range.start)}
+
+                  // ---- BLOQUEAR HORAS NO PERMITIDAS ----
+                  onSelecting={(range) => {
+                    if (!isSameOrAfterToday(range.start)) return false;
+                    return isAllowedTime(range.start);
+                  }}
+
                   onSelectSlot={handleSelectSlot}
                   onSelectEvent={handleSelectEvent}
+
+                  // ---- colores visuales para horas inválidas ----
+                  slotPropGetter={(date) => {
+                    const allowed = isAllowedTime(date);
+                    return {
+                      className: allowed
+                        ? "bg-white hover:bg-blue-50"
+                        : "bg-gray-100 opacity-40 cursor-not-allowed"
+                    };
+                  }}
+
                   style={{ height: '100%' }}
                   longPressThreshold={250}
                 />
+
               </div>
             </div>
           </section>
+
         </div>
       </div>
+
+
+      {/* ------ MODALES ------ */}
 
       <ReserveModal
         isOpen={isOpen}
@@ -447,10 +459,31 @@ const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
         defaultCourtId={slotResourceId}
         defaultStart={slotStart}
         defaultEnd={slotEnd}
-        onClose={closeModal}
+        onClose={() => {
+          setIsOpen(false);
+          setSlotStart(undefined);
+          setSlotEnd(undefined);
+          setSlotResourceId(undefined);
+        }}
         onSave={handleSaveBooking}
         saving={savingEvent}
       />
+      <ReservationInfoModal
+        isOpen={isInfoOpen}
+        event={selectedEvent}
+        courtTitle={
+          selectedEvent
+            ? courts.find(c => c.id === selectedEvent.resourceId)?.title
+            : undefined
+        }
+        canDelete={!!selectedEvent && CANCELABLE_STATES.has(selectedEvent.estado)}
+        onClose={() => {
+          setIsInfoOpen(false);
+          setSelectedEvent(null);
+        }}
+        onDelete={handleAskDeleteFromInfo}
+      />
+
 
       <CancelModal
         isOpen={isCancelOpen}
@@ -461,12 +494,9 @@ const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
         }}
         onConfirm={handleConfirmCancel}
         loading={canceling}
-        title={
-          eventToCancel
-            ? `Cancelar: ${eventToCancel.title}`
-            : 'Cancelar reserva'
-        }
+        title={eventToCancel ? `Cancelar: ${eventToCancel.title}` : 'Cancelar reserva'}
       />
+
 
       {(loading || savingEvent || canceling) && (
         <div className="fixed right-4 bottom-4 z-50 rounded-2xl bg-zinc-900 text-white px-3 py-2 text-xs shadow-xl flex items-center gap-2">
@@ -480,6 +510,7 @@ const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
           </span>
         </div>
       )}
+
     </div>
   );
 }
