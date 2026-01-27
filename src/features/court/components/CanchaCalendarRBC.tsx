@@ -18,6 +18,7 @@ import { useCreateCourtEvent } from '@/features/court/hooks/useCreateCourtEvent'
 import { CancelModal } from '@/features/court/components/CancelModal';
 import { useCancelCourtEvent } from '@/features/court/hooks/useCancelCourtEvent';
 import { ReservationInfoModal } from '@/features/court/components/ReservationInfoModal';
+import { ErrorModal } from '@/features/court/components/ErrorModal';
 
 // ---- Localizador ---
 const locales = { es };
@@ -112,6 +113,8 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
   const {
     createEvent,
     loading: savingEvent,
+    error: createError,
+    resetError: resetCreateError
   } = useCreateCourtEvent();
 
   const {
@@ -123,6 +126,7 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
   // selección de canchas visibles
   const [selected, setSelected] = useState<string[]>([]);
   const [bootstrapped, setBootstrapped] = useState(false);
+  const [isErrorOpen, setIsErrorOpen] = useState(false);
 
   // eventos locales + cancelados
   const [confirmed, setConfirmed] = useState<CalendarEvent[]>([]);
@@ -198,6 +202,8 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
 
   // selección de slot
   const handleSelectSlot = (info: SlotInfo & { resourceId?: string }) => {
+    console.log("handleSelectSlot")
+
     if (!isSameOrAfterToday(info.start)) return;
 
     // solo horarios válidos
@@ -241,24 +247,28 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
       notes,
     });
 
-    if (saved) {
-      setConfirmed((prev) => [
-        ...prev,
-        {
-          id: String(saved.id),
-          title: saved.title ?? title,
-          start: new Date(saved.startTime ?? start),
-          end: new Date(saved.endTime ?? end),
-          resourceId: String(saved.courtId ?? courtId),
-          estado: (saved.estado ?? saved.status ?? 'confirmado') as CalendarEvent['estado'],
-        },
-      ]);
-
-      setIsOpen(false);
-      setSlotStart(undefined);
-      setSlotEnd(undefined);
-      setSlotResourceId(undefined);
+    if (!saved) {
+      console.log("handleSaveBooking !saved");
+      setIsErrorOpen(true);   // abre el modal de error
+      return;                // corta ejecución
     }
+    setConfirmed((prev) => [
+      ...prev,
+      {
+        id: String(saved.id),
+        title: saved.title ?? title,
+        start: new Date(saved.startTime ?? start),
+        end: new Date(saved.endTime ?? end),
+        resourceId: String(saved.courtId ?? courtId),
+        estado: (saved.estado ?? saved.status ?? 'confirmado') as CalendarEvent['estado'],
+      },
+    ]);
+
+    setIsOpen(false);
+    setSlotStart(undefined);
+    setSlotEnd(undefined);
+    setSlotResourceId(undefined);
+
   };
 
 
@@ -495,6 +505,14 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
         onConfirm={handleConfirmCancel}
         loading={canceling}
         title={eventToCancel ? `Cancelar: ${eventToCancel.title}` : 'Cancelar reserva'}
+      />
+      <ErrorModal
+        isOpen={isErrorOpen}
+        message={createError ?? 'Horario no disponible'}
+        onClose={() => {
+          setIsErrorOpen(false);
+          resetCreateError();
+        }}
       />
 
 

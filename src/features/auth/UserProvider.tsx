@@ -8,7 +8,7 @@ const UserContext = createContext<any>(null);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const { user } = useSession();
-    console.log("UserProvider → user:", user); // 👈 agregar aquí
+  //console.log("UserProvider → user:", user); // 👈 agregar aquí
   return (
     <UserContext.Provider value={user}>
       {children}

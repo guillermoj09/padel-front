@@ -44,7 +44,7 @@ export const useCreateCourtEvent = (): UseCreateCourtEventReturn => {
         title,
         notes,
       };
-      console.log(`payload ${payload}`)
+      console.log('payload', payload);
       // Ajusta si tu API espera otra firma
       const saved = await createBooking(payload);
       return saved as Booking;
@@ -52,7 +52,8 @@ export const useCreateCourtEvent = (): UseCreateCourtEventReturn => {
       // Si tu API devuelve 409 en solapes, puedes mapear un mensaje claro:
       const status = e?.status ?? e?.response?.status;
       if (status === 409) {
-        setError('Ya existe una reserva que se superpone con ese horario.');
+        console.log(e.message);
+        setError(e.message);
       } else {
         setError(e?.message || 'Error al crear la reserva.');
       }

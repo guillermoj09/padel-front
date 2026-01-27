@@ -3,6 +3,18 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3002';
 
 type ApiInit = RequestInit & { jsonBody?: Record<string, any> | null; noStore?: boolean };
 
+export class ApiError extends Error {
+  status: number;
+  payload: any;
+
+  constructor(status: number, message: string, payload?: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
 export async function apiFetch<T = any>(path: string, init: ApiInit = {}): Promise<T> {
   const { headers, jsonBody, noStore, ...rest } = init;
   const h = new Headers(headers || {});
@@ -12,7 +24,7 @@ export async function apiFetch<T = any>(path: string, init: ApiInit = {}): Promi
     ...rest,
     method: rest.method ?? (jsonBody ? 'POST' : 'GET'),
     headers: h,
-    credentials: 'include',                     // << envía/recibe cookie httpOnly
+    credentials: 'include', // envía/recibe cookie httpOnly
     cache: noStore ? 'no-store' : (rest.cache ?? 'no-store'),
     body: jsonBody ? JSON.stringify(jsonBody) : rest.body,
   });
@@ -24,12 +36,16 @@ export async function apiFetch<T = any>(path: string, init: ApiInit = {}): Promi
 
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
+    let payload: any = null;
+
     try {
-      const payload = isJson ? await res.json() : await res.text();
-      const detail = typeof payload === 'string' ? payload : (payload?.message || payload?.error);
+      payload = isJson ? await res.json() : await res.text();
+      const detail =
+        typeof payload === 'string' ? payload : (payload?.message || payload?.error);
       if (detail) msg = Array.isArray(detail) ? detail.join(', ') : String(detail);
     } catch {}
-    throw new Error(msg);
+
+    throw new ApiError(res.status, msg, payload);
   }
 
   return (isJson ? await res.json() : await res.text()) as T;
