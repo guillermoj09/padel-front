@@ -61,6 +61,11 @@ export function ReservationInfoModal({
               {format(event.end, 'HH:mm', { locale: es })}
             </div>
           </div>
+
+          <div>
+            <div className="text-xs text-zinc-500">Teléfono</div>
+            <div className="font-medium">{event.contactPhone ?? '-'}</div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

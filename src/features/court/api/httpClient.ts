@@ -1,7 +1,12 @@
-import { startOfDay, endOfDay } from 'date-fns';
-import type { CourtApi, CourtDTO, BookingDTO, CalendarDayResponse } from './types';
+import { startOfDay, endOfDay } from "date-fns";
+import type {
+  CourtApi,
+  CourtDTO,
+  BookingDTO,
+  CalendarDayResponse,
+} from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api";
 
 async function handle<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
@@ -10,15 +15,21 @@ async function handle<T>(res: Response): Promise<T> {
 }
 
 // Pequeño limitador de concurrencia (por si luego hay más canchas)
-async function withConcurrency<T>(tasks: (() => Promise<T>)[], limit = 6): Promise<T[]> {
+async function withConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  limit = 6,
+): Promise<T[]> {
   const res: T[] = [];
   let i = 0;
-  const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
-    while (i < tasks.length) {
-      const idx = i++;
-      res[idx] = await tasks[idx]();
-    }
-  });
+  const workers = Array.from(
+    { length: Math.min(limit, tasks.length) },
+    async () => {
+      while (i < tasks.length) {
+        const idx = i++;
+        res[idx] = await tasks[idx]();
+      }
+    },
+  );
   await Promise.all(workers);
   return res;
 }
@@ -26,9 +37,15 @@ async function withConcurrency<T>(tasks: (() => Promise<T>)[], limit = 6): Promi
 export const httpClient: CourtApi = {
   async listCourts(): Promise<CourtDTO[]> {
     // Necesitamos este endpoint en tu backend (simple: devuelve [{id,title}])
-    const res = await fetch(`${API_BASE}/courts`, { credentials: 'include' });
+    const res = await fetch(`${API_BASE}/courts`, { credentials: "include" });
+
     const data = await handle<any[]>(res);
-    return data.map(c => ({ id: String(c.id), title: String(c.title ?? c.name ?? c.id) }));
+    console.log("canchas:", JSON.stringify(data, null, 2));
+    return data.map((c) => ({
+      id: String(c.id),
+      title: String(c.title ?? c.name ?? c.id),
+      type: String(c.type),
+    }));
   },
 
   async listBookingsByDay({ date, courtIds }): Promise<BookingDTO[]> {
@@ -40,15 +57,18 @@ export const httpClient: CourtApi = {
 
     const tasks = ids.map((id) => async () => {
       const url = `${API_BASE}/bookings/court/${encodeURIComponent(id)}/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
-      const r = await fetch(url, { credentials: 'include' });
+      const r = await fetch(url, { credentials: "include" });
       const rows = await handle<any[]>(r);
-
+      
       // Mapeo defensivo de nombres de campos
       return rows.map((b) => ({
         id: String(b.id),
         courtId: String(b.courtId ?? b.court_id ?? id),
-        title: String(b.title ?? 'Reserva'),
-        status: (b.status === 'pendiente' ? 'reservado' : b.status) as 'reservado' | 'confirmado',
+        title: String(b.title ?? "Reserva"),
+        status: (b.status === "pendiente" ? "reservado" : b.status) as
+          | "reservado"
+          | "confirmado",
+        phoneNumber: String(b.phoneNumber),
         startTime: new Date(b.startTime ?? b.start_time).toISOString(),
         endTime: new Date(b.endTime ?? b.end_time).toISOString(),
       })) as BookingDTO[];
@@ -61,7 +81,12 @@ export const httpClient: CourtApi = {
   async listCalendarDay({ date }): Promise<CalendarDayResponse> {
     // Agregador client-side: courts + N llamadas a /bookings/court/:id/events
     const courts = await this.listCourts();
-    const bookings = await this.listBookingsByDay({ date, courtIds: courts.map(c => c.id) });
+    const bookings = await this.listBookingsByDay({
+      date,
+      courtIds: courts.map((c) => c.id),
+    });
+    console.log("bookings http:", JSON.stringify(bookings, null, 2));
+
     return { courts, bookings };
   },
 };

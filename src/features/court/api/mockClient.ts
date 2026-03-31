@@ -31,7 +31,7 @@ const BLOCKS = [
   { h: 21, m: 0,  dur: 90, status: 'reservado'  as const },
 ];
 
-function genBookingsForDay(date: Date, courts: CourtDTO[]): BookingDTO[] {
+function getBookingsForDay(date: Date, courts: CourtDTO[]): BookingDTO[] {
   const seed = seedFromDate(date);
   const dayStart = startOfDay(date);
   const res: BookingDTO[] = [];
@@ -64,7 +64,7 @@ export const mockClient: CourtApi = {
 
   async listBookingsByDay({ date, courtIds }) {
     const courts = makeCourts(COURT_COUNT);
-    const all = genBookingsForDay(date, courts);
+    const all = getBookingsForDay(date, courts);
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
 
@@ -79,7 +79,7 @@ export const mockClient: CourtApi = {
   async listCalendarDay({ date }): Promise<CalendarDayResponse> {
     // 🔹 Un solo “endpoint”: canchas + reservas del día
     const courts = makeCourts(COURT_COUNT);
-    const bookings = genBookingsForDay(date, courts);
+    const bookings = getBookingsForDay(date, courts);
     return { courts, bookings };
   },
 };

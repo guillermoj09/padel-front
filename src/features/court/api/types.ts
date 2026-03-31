@@ -4,11 +4,13 @@ export type BookingStatus = 'reservado' | 'confirmado';
 export interface CourtDTO {
   id: string;
   title: string;
+  type: string;
 }
 
 export interface BookingDTO {
   id: string;
   courtId: string;
+  phoneNumber: string;
   title: string;
   status: BookingStatus;
   startTime: string; // ISO UTC
