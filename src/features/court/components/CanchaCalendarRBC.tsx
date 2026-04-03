@@ -563,11 +563,10 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
                   const picked = Array.isArray(value) ? value[0] : value;
                   if (!(picked instanceof Date)) return;
 
-                  setDate(picked < fechaInicial ? fechaInicial : picked);
+                  setDate(picked);
                 }}
                 next2Label={null}
                 prev2Label={null}
-                minDate={fechaInicial}
               />
             </div>
 
@@ -694,7 +693,7 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
                   culture="es"
                   date={date}
                   onNavigate={(next) => {
-                    setDate(next < fechaInicial ? fechaInicial : next);
+                    setDate(next);
                   }}
                   view={view}
                   onView={setView}
@@ -797,6 +796,33 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
           setSelectedEvent(null);
         }}
         onDelete={handleAskDeleteFromInfo}
+        onPaymentConfirmed={(bookingId, payload) => {
+          setSelectedEvent((prev) =>
+            prev && String(prev.id) === bookingId
+              ? {
+                  ...prev,
+                  paymentMethod: payload.paymentMethod,
+                  paymentStatus: payload.paymentStatus,
+                  paidAt: payload.paidAt,
+                  paymentConfirmedBy: payload.paymentConfirmedBy ?? null,
+                }
+              : prev,
+          );
+
+          setConfirmed((prev) =>
+            prev.map((item) =>
+              String(item.id) === bookingId
+                ? {
+                    ...item,
+                    paymentMethod: payload.paymentMethod,
+                    paymentStatus: payload.paymentStatus,
+                    paidAt: payload.paidAt,
+                    paymentConfirmedBy: payload.paymentConfirmedBy ?? null,
+                  }
+                : item,
+            ),
+          );
+        }}
       />
 
       <CancelModal

@@ -1,8 +1,8 @@
-// src/data/datasources/courtEventsApi.ts
 import { mockCourtEvents } from '../mocks/court/courtEvent.mock';
 import { USE_MOCKS } from '@/config/env';
-import { Booking } from '../types/booking';
-import { apiFetch } from '@/lib/api';     // <- sin "auth"
+import { apiFetch } from '@/lib/api';
+import type { Booking } from '../types/booking';
+import type { PaymentMethod } from '../hooks/useCalendarDay';
 
 export async function getCourtEvents(
   courtId: string,
@@ -10,42 +10,57 @@ export async function getCourtEvents(
   end: string
 ): Promise<Booking[]> {
   if (USE_MOCKS) {
-    console.log('[MOCK] getCourtEvents', courtId, start, end);
     return mockCourtEvents[courtId] || [];
   }
 
   const params = new URLSearchParams({ start, end }).toString();
   return apiFetch<Booking[]>(
     `/bookings/court/${encodeURIComponent(courtId)}/events?${params}`,
-    { noStore: true } // fuerza fresh si quieres
+    { noStore: true }
   );
 }
 
-export async function createBooking(booking: Booking): Promise<Booking> {
+export async function createBooking(booking: {
+  courtId: number;
+  startTime: string;
+  endTime: string;
+  title?: string;
+  notes?: string;
+}): Promise<Booking> {
   if (USE_MOCKS) {
     await new Promise((r) => setTimeout(r, 300));
-    mockCourtEvents[courtId] = [...(mockCourtEvents[courtId] || []), booking];
-    return booking;
+    const mockBooking: Booking = {
+      id: crypto.randomUUID(),
+      userId: '',
+      courtId: booking.courtId,
+      paymentId: null,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      status: 'confirmed',
+      date: booking.startTime.slice(0, 10),
+      title: booking.title ?? 'Reserva',
+    };
+    const key = String(booking.courtId);
+    mockCourtEvents[key] = [...(mockCourtEvents[key] || []), mockBooking];
+    return mockBooking;
   }
-  // NO mandamos userId. El backend debe usar req.user.id desde la cookie/JWT.
+
   const body = {
     courtId: Number(booking.courtId),
     startTime: booking.startTime,
     endTime: booking.endTime,
-    title: booking.title
-    //date: booking.startTime.split('T')[0],
-    //status: 'pendiente',
+    title: booking.title,
   };
-  console.log(body);
+
   return apiFetch<Booking>('/bookings', {
     method: 'POST',
-    jsonBody: body, // <- usa jsonBody, no body: JSON.stringify(...)
+    jsonBody: body,
   });
 }
 
 export async function cancelBooking(
   bookingId: string,
-  opts?: { reason?: string; }
+  opts?: { reason?: string }
 ): Promise<{ success: true }> {
   const { reason } = opts || {};
 
@@ -57,4 +72,20 @@ export async function cancelBooking(
   });
 
   return { success: true };
+}
+
+export async function confirmBookingPayment(
+  bookingId: string,
+  paymentMethod: Exclude<PaymentMethod, 'pendiente'>,
+): Promise<{
+  id: string;
+  paymentMethod: PaymentMethod;
+  paymentStatus: 'paid';
+  paidAt: string | null;
+  paymentConfirmedBy?: string | null;
+}> {
+  return apiFetch(`/bookings/${bookingId}/confirm-payment`, {
+    method: 'PATCH',
+    jsonBody: { paymentMethod },
+  });
 }

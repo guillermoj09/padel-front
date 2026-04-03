@@ -1,5 +1,18 @@
 export type DataSource = 'mock' | 'api';
-export type BookingStatus = 'reservado' | 'confirmado';
+export type BookingStatus =
+  | 'reservado'
+  | 'confirmado'
+  | 'pending'
+  | 'confirmed'
+  | 'cancelled';
+
+export type PaymentMethod =
+  | 'pendiente'
+  | 'transferencia'
+  | 'efectivo'
+  | 'tarjeta';
+
+export type PaymentStatus = 'pending' | 'paid';
 
 export interface CourtDTO {
   id: string;
@@ -15,6 +28,10 @@ export interface BookingDTO {
   status: BookingStatus;
   startTime: string; // ISO UTC
   endTime: string;   // ISO UTC
+  paymentMethod?: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  paidAt?: string | null;
+  paymentConfirmedBy?: string | null;
 }
 
 export interface CalendarDayResponse {
@@ -25,5 +42,5 @@ export interface CalendarDayResponse {
 export interface CourtApi {
   listCourts(): Promise<CourtDTO[]>;
   listBookingsByDay(params: { date: Date; courtIds?: string[] }): Promise<BookingDTO[]>;
-  listCalendarDay(params: { date: Date }): Promise<CalendarDayResponse>; // agregador
+  listCalendarDay(params: { date: Date }): Promise<CalendarDayResponse>;
 }
