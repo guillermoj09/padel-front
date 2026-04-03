@@ -1,21 +1,30 @@
-// src/data/mocks/courtEvents.mock.ts
-import { CourtEvent } from '@/features/court/store/courtScheduleStore';
+import type { Booking } from '@/features/court/types/booking';
 
-export const mockCourtEvents: Record<string, CourtEvent[]> = {
-  'padel-1': [
-     {
+export const mockCourtEvents: Record<string, Booking[]> = {
+  '1': [
+    {
       id: '1',
-      title: `Partido en - 9 AM`,
-      start: '2025-05-26 13:00',
-      end: '2025-05-26 14:00',
+      userId: 'mock-user-1',
+      courtId: 1,
+      paymentId: null,
+      startTime: '2025-05-26T13:00:00.000Z',
+      endTime: '2025-05-26T14:00:00.000Z',
+      status: 'confirmed',
+      date: '2025-05-26',
+      title: 'Partido en - 9 AM',
     },
     {
       id: '2',
-      title: `Clase de pádel en - 11 AM`,
-      start: '2025-05-27 11:00',
-      end: '2025-05-27 12:00',
+      userId: 'mock-user-2',
+      courtId: 1,
+      paymentId: null,
+      startTime: '2025-05-27T11:00:00.000Z',
+      endTime: '2025-05-27T12:00:00.000Z',
+      status: 'confirmed',
+      date: '2025-05-27',
+      title: 'Clase de pádel en - 11 AM',
     },
   ],
-  'padel-2': [],
-  'padel-3': [],
+  '2': [],
+  '3': [],
 };

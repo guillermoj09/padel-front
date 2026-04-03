@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { addMinutes, format, set } from 'date-fns';
+import { addMinutes, set } from 'date-fns';
 
 type Booking = { id: string; courtId: string; start: string; end: string };
 
@@ -23,28 +23,31 @@ export default function DayTimelineSlots({
 }: {
   date: Date;
   bookings: Booking[];
-  onPick: (time: string /* 'HH:mm' */, duration: number) => void;
+  onPick: (time: string, duration: number) => void;
   startHour?: number;
   endHour?: number;
   stepMinutes?: number;
   defaultDuration?: number;
 }) {
   const slots = useMemo(() => {
-    const out: { t: string; busy: boolean }[] = [];
-    for (let h = startHour; h <= endHour; h++) {
+    const output: { t: string; busy: boolean }[] = [];
+
+    for (let h = startHour; h <= endHour; h += 1) {
       for (let m = 0; m < 60; m += stepMinutes) {
         const t = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        const s = buildDate(date, t);
-        const e = addMinutes(s, defaultDuration);
-        const busy = bookings.some(b => {
-          const bs = new Date(b.start);
-          const be = new Date(b.end);
-          return overlaps(s, e, bs, be);
+        const startSlot = buildDate(date, t);
+        const endSlot = addMinutes(startSlot, defaultDuration);
+        const busy = bookings.some((booking) => {
+          const bookingStart = new Date(booking.start);
+          const bookingEnd = new Date(booking.end);
+          return overlaps(startSlot, endSlot, bookingStart, bookingEnd);
         });
-        out.push({ t, busy });
+
+        output.push({ t, busy });
       }
     }
-    return out;
+
+    return output;
   }, [date, bookings, startHour, endHour, stepMinutes, defaultDuration]);
 
   return (
@@ -52,7 +55,13 @@ export default function DayTimelineSlots({
       <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
         Clic en una hora para crear (duración por defecto {defaultDuration} min)
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 8 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0,1fr))',
+          gap: 8,
+        }}
+      >
         {slots.map(({ t, busy }) => (
           <button
             key={t}

@@ -7,6 +7,7 @@ import type {
   PaymentMethod,
   PaymentStatus,
 } from '@/features/court/api/types';
+import { getErrorMessage } from '@/lib/errors';
 
 export type CalendarEvent = {
   id: string;
@@ -35,41 +36,48 @@ export function useCalendarDay(params: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const dateValue = date.getTime();
+
   useEffect(() => {
     let alive = true;
+    const currentDate = new Date(dateValue);
 
     (async () => {
       try {
         setLoading(true);
         setError('');
 
-        const { courts, bookings } = await api.listCalendarDay({ date });
-        console.log('bookings use:', JSON.stringify(bookings, null, 2));
+        const { courts: courtList, bookings } = await api.listCalendarDay({
+          date: currentDate,
+        });
 
         if (!alive) return;
 
-        const allowed = new Set(courts.slice(0, maxCourts).map((c) => c.id));
-        setCourts(courts.slice(0, maxCourts));
+        const limitedCourts = courtList.slice(0, maxCourts);
+        const allowed = new Set(limitedCourts.map((court) => court.id));
 
+        setCourts(limitedCourts);
         setEventsAll(
           bookings
-            .filter((b) => allowed.has(b.courtId))
-            .map((b: BookingDTO) => ({
-              id: String(b.id),
-              title: b.title,
-              start: new Date(b.startTime),
-              end: new Date(b.endTime),
-              resourceId: b.courtId,
-              estado: b.status,
-              contactPhone: b.phoneNumber,
-              paymentMethod: b.paymentMethod ?? 'pendiente',
-              paymentStatus: b.paymentStatus ?? 'pending',
-              paidAt: b.paidAt ?? null,
-              paymentConfirmedBy: b.paymentConfirmedBy ?? null,
+            .filter((booking) => allowed.has(booking.courtId))
+            .map((booking: BookingDTO) => ({
+              id: String(booking.id),
+              title: booking.title,
+              start: new Date(booking.startTime),
+              end: new Date(booking.endTime),
+              resourceId: booking.courtId,
+              estado: booking.status,
+              contactPhone: booking.phoneNumber,
+              paymentMethod: booking.paymentMethod ?? 'pendiente',
+              paymentStatus: booking.paymentStatus ?? 'pending',
+              paidAt: booking.paidAt ?? null,
+              paymentConfirmedBy: booking.paymentConfirmedBy ?? null,
             })),
         );
-      } catch (e: any) {
-        if (alive) setError(e.message || 'Error cargando calendario del día');
+      } catch (error: unknown) {
+        if (alive) {
+          setError(getErrorMessage(error, 'Error cargando calendario del día'));
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -78,7 +86,7 @@ export function useCalendarDay(params: {
     return () => {
       alive = false;
     };
-  }, [api, date.getFullYear(), date.getMonth(), date.getDate(), maxCourts]);
+  }, [api, dateValue, maxCourts]);
 
   return { courts, eventsAll, loading, error };
 }

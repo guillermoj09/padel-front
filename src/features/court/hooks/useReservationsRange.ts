@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import type { CalendarEvent } from './useCalendarDay';
+import type {
+  PaymentMethod,
+  PaymentStatus,
+} from '@/features/court/api/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3002';
 
@@ -15,8 +19,6 @@ type UseReservationsRangeParams = {
 };
 
 export type ReservationRangeEvent = CalendarEvent & {
-  paymentStatus?: string | null;
-  paymentMethod?: string | null;
   priceApplied?: number | null;
   currencyApplied?: string | null;
   phoneNumber?: string | null;
@@ -35,6 +37,91 @@ type UseReservationsRangeResult = {
   loading: boolean;
   error: string | null;
 };
+
+type ApiRow = Record<string, unknown>;
+
+function readString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return '';
+}
+
+function readNullableString(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  if (typeof value === 'number') {
+    return String(value);
+  }
+
+  return undefined;
+}
+
+function readNullableNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function normalizeEstado(value: unknown): CalendarEvent['estado'] {
+  const estado = readString(value).toLowerCase();
+
+  if (['confirmado', 'confirmed'].includes(estado)) return 'confirmado';
+  if (['cancelado', 'cancelada', 'cancelled', 'canceled'].includes(estado)) {
+    return 'cancelado';
+  }
+  if (['reservado', 'reservada', 'reserved', 'pending', 'pendiente'].includes(estado)) {
+    return 'pending';
+  }
+
+  return 'pending';
+}
+
+function normalizePaymentStatus(value: unknown): PaymentStatus | undefined {
+  const paymentStatus = readString(value).toLowerCase();
+
+  if (!paymentStatus) return undefined;
+  if (['paid', 'pagado', 'payed'].includes(paymentStatus)) return 'paid';
+  if (['pending', 'pendiente'].includes(paymentStatus)) return 'pending';
+
+  return undefined;
+}
+
+function normalizePaymentMethod(value: unknown): PaymentMethod | undefined {
+  const paymentMethod = readString(value).toLowerCase();
+
+  if (!paymentMethod) return undefined;
+  if (['efectivo', 'cash'].includes(paymentMethod)) return 'efectivo';
+  if (['transferencia', 'transfer', 'bank_transfer', 'wire'].includes(paymentMethod)) {
+    return 'transferencia';
+  }
+  if (['tarjeta', 'card', 'credit_card', 'debit_card'].includes(paymentMethod)) {
+    return 'tarjeta';
+  }
+  if (['pendiente', 'pending'].includes(paymentMethod)) return 'pendiente';
+
+  return undefined;
+}
+
+function toDate(value: unknown): Date {
+  if (value instanceof Date) return value;
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+
+  return new Date();
+}
 
 export function useReservationsRange({
   from,
@@ -80,84 +167,100 @@ export function useReservationsRange({
           throw new Error(`HTTP ${res.status}`);
         }
 
-        const json = await res.json();
+        const json: unknown = await res.json();
         if (cancelled) return;
 
-        const items = Array.isArray(json?.items)
-          ? json.items
+        const items: ApiRow[] = Array.isArray((json as { items?: unknown })?.items)
+          ? (((json as { items?: unknown[] }).items ?? []) as ApiRow[])
           : Array.isArray(json)
-            ? json
+            ? (json as ApiRow[])
             : [];
 
-        const mapped: ReservationRangeEvent[] = items.map((r: any) => ({
-          id: String(r.id),
-          title: r.title ?? r.nombre ?? r.customerName ?? r.contactName ?? 'Sin título',
-          start: new Date(r.startTime ?? r.start),
-          end: new Date(r.endTime ?? r.end),
-          resourceId: String(r.courtId ?? r.canchaId ?? r.resourceId ?? ''),
-          estado: (r.estado ?? r.status ?? 'pending') as CalendarEvent['estado'],
+        const mapped: ReservationRangeEvent[] = items.map((row) => ({
+          id: readString(row.id),
+          title:
+            readNullableString(
+              row.title ??
+                row.nombre ??
+                row.customerName ??
+                row.clientName ??
+                row.contactName,
+            ) ?? 'Sin título',
+          start: toDate(row.startTime ?? row.start),
+          end: toDate(row.endTime ?? row.end),
+          resourceId: readString(row.courtId ?? row.canchaId ?? row.resourceId),
+          estado: normalizeEstado(row.estado ?? row.status),
 
-          paymentStatus: r.paymentStatus ?? r.payment_state ?? r.statusPayment ?? null,
-          paymentMethod: r.paymentMethod ?? r.paymentType ?? r.payment_method ?? null,
+          paymentStatus: normalizePaymentStatus(
+            row.paymentStatus ?? row.payment_state ?? row.statusPayment,
+          ),
+          paymentMethod: normalizePaymentMethod(
+            row.paymentMethod ?? row.paymentType ?? row.payment_method,
+          ),
 
           priceApplied:
-            r.priceApplied != null
-              ? Number(r.priceApplied)
-              : r.amount != null
-                ? Number(r.amount)
-                : r.total != null
-                  ? Number(r.total)
-                  : r.price != null
-                    ? Number(r.price)
-                    : null,
+            readNullableNumber(row.priceApplied) ??
+            readNullableNumber(row.amount) ??
+            readNullableNumber(row.total) ??
+            readNullableNumber(row.price),
 
-          currencyApplied: r.currencyApplied ?? r.currency ?? 'CLP',
+          currencyApplied:
+            readNullableString(row.currencyApplied ?? row.currency) ?? 'CLP',
 
-          phoneNumber:
-            r.phoneNumber ??
-            r.customerPhone ??
-            r.phone ??
-            r.cellphone ??
-            r.celular ??
-            r.telefono ??
-            null,
+          phoneNumber: readNullableString(
+            row.phoneNumber ??
+              row.customerPhone ??
+              row.phone ??
+              row.cellphone ??
+              row.celular ??
+              row.telefono,
+          ),
 
-          customerPhone:
-            r.customerPhone ??
-            r.phoneNumber ??
-            r.phone ??
-            r.cellphone ??
-            r.celular ??
-            r.telefono ??
-            null,
+          customerPhone: readNullableString(
+            row.customerPhone ??
+              row.phoneNumber ??
+              row.phone ??
+              row.cellphone ??
+              row.celular ??
+              row.telefono,
+          ),
 
-          customerName:
-            r.customerName ??
-            r.clientName ??
-            r.contactName ??
-            r.name ??
-            r.fullName ??
-            null,
+          customerName: readNullableString(
+            row.customerName ??
+              row.clientName ??
+              row.contactName ??
+              row.name ??
+              row.fullName,
+          ),
 
-          clientName:
-            r.clientName ??
-            r.customerName ??
-            r.contactName ??
-            r.name ??
-            r.fullName ??
-            null,
+          clientName: readNullableString(
+            row.clientName ??
+              row.customerName ??
+              row.contactName ??
+              row.name ??
+              row.fullName,
+          ),
 
-          contactName: r.contactName ?? r.customerName ?? r.clientName ?? null,
-          courtName: r.courtName ?? r.courtTitle ?? null,
-          courtTitle: r.courtTitle ?? r.courtName ?? null,
-          notes: r.notes ?? r.note ?? r.observations ?? r.comment ?? null,
-          description: r.description ?? r.notes ?? null,
+          contactName: readNullableString(
+            row.contactName ?? row.customerName ?? row.clientName,
+          ),
+          courtName: readNullableString(row.courtName ?? row.courtTitle),
+          courtTitle: readNullableString(row.courtTitle ?? row.courtName),
+          notes: readNullableString(
+            row.notes ?? row.note ?? row.observations ?? row.comment,
+          ),
+          description: readNullableString(row.description ?? row.notes),
         }));
 
         setEvents(mapped);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (cancelled) return;
-        setError(e?.message ?? 'Error cargando reservas');
+
+        if (e instanceof Error) {
+          setError(e.message);
+        } else {
+          setError('Error cargando reservas');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -1,19 +1,15 @@
 'use client';
 
-import { createContext, useContext } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { useSession } from '@/features/auth/hooks/useSession';
+import type { AuthUser } from '@/features/auth/types';
 
-// El contexto solo guarda EL USUARIO, no un objeto grande
-const UserContext = createContext<any>(null);
+const UserContext = createContext<AuthUser | null>(null);
 
-export function UserProvider({ children }: { children: React.ReactNode }) {
+export function UserProvider({ children }: { children: ReactNode }) {
   const { user } = useSession();
-  //console.log("UserProvider → user:", user); // 👈 agregar aquí
-  return (
-    <UserContext.Provider value={user}>
-      {children}
-    </UserContext.Provider>
-  );
+
+  return <UserContext.Provider value={user}>{children}</UserContext.Provider>;
 }
 
 export function useUser() {

@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
+import type { AuthMeResponse, AuthUser } from '@/features/auth/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3002";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3002';
 
 export function useSession() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -13,17 +13,17 @@ export function useSession() {
     async function load() {
       try {
         const res = await fetch(`${API_BASE}/auth/me`, {
-          credentials: "include",
+          credentials: 'include',
         });
 
         if (!res.ok) {
           if (active) setUser(null);
-        } else {
-          const data = await res.json();
-          if (active) {
-            // 👇🔥 ESTA ES LA LÍNEA CORRECTA
-            setUser(data.user);
-          }
+          return;
+        }
+
+        const data = (await res.json()) as AuthMeResponse;
+        if (active) {
+          setUser(data.user);
         }
       } catch {
         if (active) setUser(null);
@@ -33,7 +33,9 @@ export function useSession() {
     }
 
     load();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   return { user, loading, isAuthenticated: !!user };

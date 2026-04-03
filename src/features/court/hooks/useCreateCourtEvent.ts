@@ -2,11 +2,8 @@
 import { useCallback, useState } from 'react';
 import { createBooking } from '@/features/court/services/bookingApi';
 import type { Booking } from '@/features/court/types/booking';
+import { getErrorMessage, getErrorStatus } from '@/lib/errors';
 
-/**
- * Parámetros para crear una reserva.
- * Usa Date en local; el hook normaliza a ISO UTC para el backend.
- */
 export type CreateEventParams = {
   courtId: string | number;
   start: Date;
@@ -22,10 +19,6 @@ export type UseCreateCourtEventReturn = {
   resetError: () => void;
 };
 
-/**
- * Hook minimalista para CREAR reservas de cancha.
- * No trae eventos; solo realiza el POST y expone loading/error.
- */
 export const useCreateCourtEvent = (): UseCreateCourtEventReturn => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,26 +29,24 @@ export const useCreateCourtEvent = (): UseCreateCourtEventReturn => {
     const { courtId, start, end, title, notes } = params;
     setLoading(true);
     setError(null);
+
     try {
       const payload = {
         courtId: Number(courtId),
-        startTime: start.toISOString(), // normaliza a ISO (UTC)
+        startTime: start.toISOString(),
         endTime: end.toISOString(),
         title,
         notes,
       };
-      console.log('payload', payload);
-      // Ajusta si tu API espera otra firma
+
       const saved = await createBooking(payload);
       return saved as Booking;
-    } catch (e: any) {
-      // Si tu API devuelve 409 en solapes, puedes mapear un mensaje claro:
-      const status = e?.status ?? e?.response?.status;
+    } catch (error: unknown) {
+      const status = getErrorStatus(error);
       if (status === 409) {
-        console.log(e.message);
-        setError(e.message);
+        setError(getErrorMessage(error, 'La reserva se superpone con otra existente.'));
       } else {
-        setError(e?.message || 'Error al crear la reserva.');
+        setError(getErrorMessage(error, 'Error al crear la reserva.'));
       }
       return null;
     } finally {

@@ -6,9 +6,10 @@ import {
   Views,
   dateFnsLocalizer,
   type SlotInfo,
+  type View,
 } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
-import es from 'date-fns/locale/es';
+import { es } from 'date-fns/locale/es';
 import Calendar from 'react-calendar';
 
 import {
@@ -77,26 +78,28 @@ function isFutbolType(value?: string | null) {
 }
 
 // ---- Helpers estado evento ---
-function normalizeEstado(value?: string | null): CalendarEvent['estado'] {
+type NormalizedEstado = 'pending' | 'reserved' | 'confirmed' | 'canceled';
+
+function normalizeEstado(value?: string | null): NormalizedEstado {
   const estado = String(value ?? '').trim().toLowerCase();
 
   if (['pending', 'pendiente'].includes(estado)) {
-    return 'pending' as CalendarEvent['estado'];
+    return 'pending';
   }
 
   if (['reserved', 'reservado', 'reservada'].includes(estado)) {
-    return 'reserved' as CalendarEvent['estado'];
+    return 'reserved';
   }
 
   if (['confirmed', 'confirmado', 'confirmada'].includes(estado)) {
-    return 'confirmed' as CalendarEvent['estado'];
+    return 'confirmed';
   }
 
   if (['canceled', 'cancelado', 'cancelada'].includes(estado)) {
-    return 'canceled' as CalendarEvent['estado'];
+    return 'canceled';
   }
 
-  return 'pending' as CalendarEvent['estado'];
+  return 'pending';
 }
 
 // ---- Estados visuales eventos ---
@@ -128,7 +131,7 @@ function eventPropGetter(event: CalendarEvent) {
 }
 
 type Props = { dataSource?: DataSource };
-const CANCELABLE_STATES = new Set(['pending', 'reserved', 'confirmed']);
+const CANCELABLE_STATES = new Set<NormalizedEstado>(['pending', 'reserved', 'confirmed']);
 
 // ==========================
 //  HORARIOS PERMITIDOS
@@ -178,7 +181,7 @@ const addMinutes = (date: Date, minutes: number) =>
 export default function CanchaCalendarRBC({ dataSource }: Props) {
   const [mounted, setMounted] = useState(false);
   const [fechaInicial, setFechaInicial] = useState<Date>(SAFE_INITIAL_DATE);
-  const [view, setView] = useState(Views.DAY);
+  const [view, setView] = useState<View>(Views.DAY);
   const [date, setDate] = useState<Date>(SAFE_INITIAL_DATE);
 
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -479,7 +482,7 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
         start: new Date(saved.startTime ?? start),
         end: new Date(saved.endTime ?? end),
         resourceId: String(saved.courtId ?? courtId),
-        estado: normalizeEstado(saved.estado ?? saved.status ?? 'confirmed'),
+        estado: normalizeEstado(saved.status ?? 'confirmed'),
       } as CalendarEvent,
     ]);
 
@@ -516,7 +519,8 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
 
   const handleAskDeleteFromInfo = () => {
     if (!selectedEvent) return;
-    if (!CANCELABLE_STATES.has(normalizeEstado(selectedEvent.estado))) return;
+    const normalizedEstado = normalizeEstado(selectedEvent.estado);
+    if (!CANCELABLE_STATES.has(normalizedEstado)) return;
 
     setEventToCancel(selectedEvent);
     setIsCancelOpen(true);
@@ -696,7 +700,7 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
                     setDate(next);
                   }}
                   view={view}
-                  onView={setView}
+                  onView={(nextView) => setView(nextView)}
                   defaultView={Views.DAY}
                   views={[Views.DAY, Views.WEEK]}
                   step={30}
@@ -775,7 +779,6 @@ export default function CanchaCalendarRBC({ dataSource }: Props) {
           setSlotResourceId(undefined);
         }}
         onSave={handleSaveBooking}
-        saving={savingEvent}
       />
 
       <ReservationInfoModal

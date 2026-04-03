@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import es from 'date-fns/locale/es';
+import { es } from 'date-fns/locale/es';
 
 import type { CalendarEvent } from '@/features/court/hooks/useCalendarDay';
 
@@ -11,12 +11,13 @@ type Court = { id: string; title: string };
 type Props = {
   events: CalendarEvent[];
   courts: Court[];
-  onCancel?: (id: string) => void; // acción opcional
+  onCancel?: (id: string) => void;
 };
 
 function estadoBadge(estado: CalendarEvent['estado']) {
   const base =
     'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium';
+
   switch (estado) {
     case 'confirmado':
       return `${base} bg-green-100 text-green-800`;
@@ -47,22 +48,18 @@ export function AdminReservationsTable({ events, courts, onCancel }: Props) {
       .filter((ev) => {
         if (statusFilter !== 'all' && ev.estado !== statusFilter) return false;
         if (!search.trim()) return true;
-        const q = search.toLowerCase();
 
-        const canchaTitle = courtsById.get(ev.resourceId)?.toLowerCase() ?? '';
+        const q = search.toLowerCase();
+        const canchaTitle =
+          courtsById.get(String(ev.resourceId))?.toLowerCase() ?? '';
         const title = ev.title?.toLowerCase() ?? '';
 
-        return (
-          title.includes(q) ||
-          canchaTitle.includes(q)
-          // si luego añades clienteNombre, clienteTelefono, etc.
-        );
+        return title.includes(q) || canchaTitle.includes(q);
       });
   }, [events, search, statusFilter, courtsById]);
 
   return (
     <div className="space-y-3">
-      {/* Filtros */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <input
@@ -91,7 +88,6 @@ export function AdminReservationsTable({ events, courts, onCancel }: Props) {
         </div>
       </div>
 
-      {/* Tabla */}
       <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
         <table className="min-w-full text-sm">
           <thead className="bg-zinc-50">
@@ -118,7 +114,8 @@ export function AdminReservationsTable({ events, courts, onCancel }: Props) {
 
             {filtered.map((ev) => {
               const cancha =
-                courtsById.get(ev.resourceId) ?? `Cancha ${ev.resourceId}`;
+                courtsById.get(String(ev.resourceId)) ??
+                `Cancha ${String(ev.resourceId)}`;
               const fecha = format(ev.start, 'dd/MM/yyyy', { locale: es });
               const hora = `${format(ev.start, 'HH:mm')} – ${format(ev.end, 'HH:mm')}`;
 
@@ -128,9 +125,7 @@ export function AdminReservationsTable({ events, courts, onCancel }: Props) {
                   <td className="px-3 py-2 align-middle tabular-nums">{hora}</td>
                   <td className="px-3 py-2 align-middle">{cancha}</td>
                   <td className="px-3 py-2 align-middle">
-                    <span className="font-medium">
-                      {ev.title || 'Sin título'}
-                    </span>
+                    <span className="font-medium">{ev.title || 'Sin título'}</span>
                   </td>
                   <td className="px-3 py-2 align-middle">
                     <span className={estadoBadge(ev.estado)}>{ev.estado}</span>

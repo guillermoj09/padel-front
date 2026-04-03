@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState } from 'react';
+import { getErrorMessage } from '@/lib/errors';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3002";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3002';
 
 export function useLogin() {
   const [loading, setLoading] = useState(false);
@@ -14,24 +15,26 @@ export function useLogin() {
 
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        credentials: "include",     // 🔥 recibe cookie HttpOnly del backend
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
       if (!res.ok) {
         let msg = `Error: ${res.status}`;
         try {
-          msg = (await res.json()).message || msg;
-        } catch {}
+          const payload = (await res.json()) as { message?: string };
+          msg = payload.message || msg;
+        } catch {
+          // noop
+        }
         throw new Error(msg);
       }
 
-      // Cookie ya seteada → hard reload
       window.location.replace(next);
-    } catch (e: any) {
-      setError(e?.message ?? "Error desconocido");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Error desconocido'));
     } finally {
       setLoading(false);
     }

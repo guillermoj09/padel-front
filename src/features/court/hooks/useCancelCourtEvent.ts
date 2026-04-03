@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { cancelBooking } from '@/features/court/services/bookingApi';
+import { getErrorMessage } from '@/lib/errors';
 
 type CancelPayload = {
   id: string;
@@ -18,8 +19,8 @@ export function useCancelCourtEvent() {
     try {
       await cancelBooking(id, { reason });
       return true;
-    } catch (e: any) {
-      setError(e?.message ?? 'No se pudo cancelar');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'No se pudo cancelar'));
       return false;
     } finally {
       setLoading(false);

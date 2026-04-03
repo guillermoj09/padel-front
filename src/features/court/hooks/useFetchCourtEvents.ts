@@ -1,18 +1,24 @@
-import { getCourtEvents } from "@/features/court/services/bookingApi";
-import { useCourtSchedule } from "@/features/court/store/courtScheduleStore";
-import { Booking } from "../types/booking";
+import { getCourtEvents } from '@/features/court/services/bookingApi';
+import type { Booking } from '../types/booking';
+
+type FetchCourtEventsParams = {
+  courtId: string;
+  startStr: string;
+  endStr: string;
+};
 
 export function useFetchCourtEvents() {
-  //const setEventsByCourt = useCourtSchedule((state) => state.setEventsByCourt);
-
-  const fetchEvents = async (courtId: string, startStr: string, startEnd: string) => {
+  const fetchEvents = async ({
+    courtId,
+    startStr,
+    endStr,
+  }: FetchCourtEventsParams): Promise<Booking[]> => {
     try {
-      const booking: Booking[] = await getCourtEvents(courtId,startStr,startEnd);
-      //console.log('useFetchCourtEvents '+booking[0].date);
-      //setEventsByCourt(courtId, booking);
+      const booking = await getCourtEvents(courtId, startStr, endStr);
       return booking;
     } catch (error) {
-      console.error("Error fetching court events:", error);
+      console.error('Error fetching court events:', error);
+      return [];
     }
   };
 

@@ -1,8 +1,7 @@
 // src/store/useCourtSchedule.ts
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { Booking } from '@/features/court/types/booking';
-
+import { createJSONStorage, persist } from 'zustand/middleware';
+import type { Booking } from '@/features/court/types/booking';
 
 type CourtScheduleState = {
   eventsByCourt: Record<string, Booking[]>;
@@ -11,17 +10,15 @@ type CourtScheduleState = {
   setEventsByCourt: (courtId: string, events: Booking[]) => void;
 };
 
-//console.log("entro");
-
-export const useCourtSchedule = create(
-  persist<CourtScheduleState>(
+export const useCourtSchedule = create<CourtScheduleState>()(
+  persist(
     (set, get) => ({
       eventsByCourt: {
         '1': [],
         '2': [],
         '3': [],
       },
-      
+
       getEvents: (courtId) => get().eventsByCourt[courtId] || [],
 
       addEvent: (courtId, event) =>
@@ -41,8 +38,8 @@ export const useCourtSchedule = create(
         })),
     }),
     {
-      name: 'court-schedule-storage', // clave para localStorage
-      getStorage: () => localStorage, // puede ser sessionStorage si prefieres
+      name: 'court-schedule-storage',
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );

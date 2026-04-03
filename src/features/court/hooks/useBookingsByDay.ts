@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getCourtApi } from '@/features/court/api/clientFactory';
 import type { DataSource, BookingDTO } from '@/features/court/api/types';
+import { getErrorMessage } from '@/lib/errors';
 
 export interface CalendarEvent {
   id: string;
@@ -11,7 +12,11 @@ export interface CalendarEvent {
   estado: 'reservado' | 'confirmado';
 }
 
-export function useBookingsByDay(params: { date: Date; courtIds: string[]; source?: DataSource }) {
+export function useBookingsByDay(params: {
+  date: Date;
+  courtIds: string[];
+  source?: DataSource;
+}) {
   const { date, courtIds, source } = params;
   const api = getCourtApi(source);
 
@@ -19,31 +24,50 @@ export function useBookingsByDay(params: { date: Date; courtIds: string[]; sourc
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const dateValue = date.getTime();
+  const courtIdsKey = useMemo(() => courtIds.join('|'), [courtIds]);
+
   useEffect(() => {
     let alive = true;
+
+    const currentDate = new Date(dateValue);
+    const currentCourtIds = courtIdsKey ? courtIdsKey.split('|') : [];
+
     (async () => {
       try {
-        setLoading(true); setError('');
-        const data: BookingDTO[] = await api.listBookingsByDay({ date, courtIds });
+        setLoading(true);
+        setError('');
+
+        const data: BookingDTO[] = await api.listBookingsByDay({
+          date: currentDate,
+          courtIds: currentCourtIds,
+        });
+
         if (!alive) return;
+
         setEvents(
-          data.map(b => ({
-            id: String(b.id),
-            title: b.title,
-            start: new Date(b.startTime),
-            end: new Date(b.endTime),
-            resourceId: b.courtId,
-            estado: b.status,
-          }))
+          data.map((booking) => ({
+            id: String(booking.id),
+            title: booking.title,
+            start: new Date(booking.startTime),
+            end: new Date(booking.endTime),
+            resourceId: booking.courtId,
+            estado: booking.status === 'confirmado' ? 'confirmado' : 'reservado',
+          })),
         );
-      } catch (e: any) {
-        if (alive) setError(e.message || 'Error al listar reservas');
+      } catch (error: unknown) {
+        if (alive) {
+          setError(getErrorMessage(error, 'Error al listar reservas'));
+        }
       } finally {
         if (alive) setLoading(false);
       }
     })();
-    return () => { alive = false };
-  }, [api, date.getFullYear(), date.getMonth(), date.getDate(), courtIds.join('|')]);
+
+    return () => {
+      alive = false;
+    };
+  }, [api, dateValue, courtIdsKey]);
 
   return { events, loading, error };
 }

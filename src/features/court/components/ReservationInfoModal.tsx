@@ -2,11 +2,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import es from 'date-fns/locale/es';
-import type {
-  CalendarEvent,
-  PaymentMethod,
-} from '@/features/court/hooks/useCalendarDay';
+import { es } from 'date-fns/locale/es';
+import type { CalendarEvent } from '@/features/court/hooks/useCalendarDay';
+import type { PaymentMethod } from '@/features/court/api/types';
 import { confirmBookingPayment } from '@/features/court/services/bookingApi';
 
 type Props = {

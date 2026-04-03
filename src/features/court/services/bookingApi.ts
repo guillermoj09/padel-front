@@ -2,7 +2,7 @@ import { mockCourtEvents } from '../mocks/court/courtEvent.mock';
 import { USE_MOCKS } from '@/config/env';
 import { apiFetch } from '@/lib/api';
 import type { Booking } from '../types/booking';
-import type { PaymentMethod } from '../hooks/useCalendarDay';
+import type { PaymentMethod } from '../api/types';
 
 export async function getCourtEvents(
   courtId: string,

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
+import { getErrorMessage } from '@/lib/errors';
 
 type Resource = { id: string; title: string };
 
@@ -38,30 +39,26 @@ export function ReserveModal({
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string>('');
   const [saving, setSaving] = useState(false);
-
-  // Crear contenedor del portal sólo en cliente
   const [container, setContainer] = useState<HTMLElement | null>(null);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    let el = document.getElementById('modal-root') as HTMLElement | null;
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'modal-root';
-      document.body.appendChild(el);
+
+    let element = document.getElementById('modal-root') as HTMLElement | null;
+    if (!element) {
+      element = document.createElement('div');
+      element.id = 'modal-root';
+      document.body.appendChild(element);
     }
-    setContainer(el);
+
+    setContainer(element);
   }, []);
 
-  // Sincroniza defaults al abrir
   useEffect(() => {
     setTitle('');
     setNotes('');
     setError('');
-    if (defaultCourtId) {
-      setCourtId(defaultCourtId);
-    } else {
-      setCourtId(resources[0]?.id ?? '');
-    }
+    setCourtId(defaultCourtId ?? resources[0]?.id ?? '');
     setStart(defaultStart);
     setEnd(defaultEnd);
   }, [isOpen, defaultCourtId, defaultStart, defaultEnd, resources]);
@@ -75,11 +72,12 @@ export function ReserveModal({
   };
 
   const handleSave = async () => {
-    const v = validate();
-    if (v) {
-      setError(v);
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
     }
+
     setSaving(true);
     try {
       await onSave({
@@ -89,11 +87,10 @@ export function ReserveModal({
         end: end as Date,
         notes: notes.trim() || undefined,
       });
-      // Si el padre no cerró, cerramos acá
       onClose();
-    } catch (e: any) {
-      console.error('Error creando reserva', e);
-      setError(e?.message || 'No se pudo crear la reserva.');
+    } catch (error: unknown) {
+      console.error('Error creando reserva', error);
+      setError(getErrorMessage(error, 'No se pudo crear la reserva.'));
     } finally {
       setSaving(false);
     }
@@ -102,13 +99,18 @@ export function ReserveModal({
   if (!isOpen || !container) return null;
 
   return createPortal(
-    <div aria-modal="true" role="dialog" className="fixed inset-0 z-[1000] flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/30" onClick={!saving ? onClose : undefined} />
+    <div
+      aria-modal="true"
+      role="dialog"
+      className="fixed inset-0 z-[1000] flex items-center justify-center"
+    >
+      <div
+        className="absolute inset-0 bg-black/30"
+        onClick={!saving ? onClose : undefined}
+      />
 
-      {/* Panel */}
-      <div className="relative z-[1001] w-[420px] rounded-2xl bg-white shadow-xl border border-gray-200">
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+      <div className="relative z-[1001] w-[420px] rounded-2xl border border-gray-200 bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
           <h2 className="text-base font-semibold">Nueva reserva</h2>
           <button
             onClick={onClose}
@@ -120,9 +122,9 @@ export function ReserveModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
+        <div className="space-y-4 px-5 py-4">
           {!resources.length && (
-            <div className="p-3 text-sm rounded-md bg-yellow-50 text-yellow-900 border border-yellow-200">
+            <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
               No hay canchas disponibles. Cierra y selecciona alguna cancha en la lista.
             </div>
           )}
@@ -146,8 +148,10 @@ export function ReserveModal({
               onChange={(e) => setCourtId(e.target.value)}
               disabled={saving || !resources.length}
             >
-              {resources.map(r => (
-                <option key={r.id} value={r.id}>{r.title}</option>
+              {resources.map((resource) => (
+                <option key={resource.id} value={resource.id}>
+                  {resource.title}
+                </option>
               ))}
             </select>
           </div>
@@ -180,37 +184,38 @@ export function ReserveModal({
           {error && <div className="text-sm text-red-600">{error}</div>}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
+        <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-4">
           <button
             onClick={onClose}
             disabled={saving}
-            className="rounded-md px-4 py-2 text-sm border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !resources.length}
-            className="rounded-md px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
         </div>
       </div>
     </div>,
-    container
+    container,
   );
 }
 
-function toLocalInputValue(d: Date) {
+function toLocalInputValue(date: Date) {
   const pad = (n: number) => String(n).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mi = pad(d.getMinutes());
+  const yyyy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mi = pad(date.getMinutes());
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 }
-function fromLocalInputValue(v: string) {
-  return v ? new Date(v) : undefined;
+
+function fromLocalInputValue(value: string) {
+  return value ? new Date(value) : undefined;
 }

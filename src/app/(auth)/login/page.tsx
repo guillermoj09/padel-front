@@ -1,28 +1,40 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { useLogin } from "@/features/auth/hooks/useLogin";
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useLogin } from '@/features/auth/hooks/useLogin';
 
-export default function LoginPage() {
+function LoginPageFallback() {
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-zinc-50">
+      <div className="w-full max-w-xs bg-white px-6 py-8 shadow rounded">
+        <h1 className="text-xl font-semibold text-center mb-4">
+          Iniciar sesión
+        </h1>
+        <p className="text-sm text-zinc-500 text-center">Cargando...</p>
+      </div>
+    </main>
+  );
+}
+
+function LoginPageContent() {
   const search = useSearchParams();
-  const next = search.get("next") || "/admin/booking";
+  const next = search.get('next') || '/admin/booking';
 
   const { login, loading, error } = useLogin();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    login(email, password, next); // 🔥 ahora login va por el hook
+    login(email, password, next);
   }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-zinc-50">
       <div className="w-full max-w-xs bg-white px-6 py-8 shadow rounded">
-
         <h1 className="text-xl font-semibold text-center mb-4">
           Iniciar sesión
         </h1>
@@ -32,7 +44,6 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={onSubmit} className="space-y-4">
-
           <div>
             <label className="text-sm text-zinc-600">Correo</label>
             <input
@@ -49,7 +60,7 @@ export default function LoginPage() {
             <label className="text-sm text-zinc-600">Contraseña</label>
             <div className="relative">
               <input
-                type={showPwd ? "text" : "password"}
+                type={showPwd ? 'text' : 'password'}
                 className="mt-1 w-full border px-3 py-2 rounded"
                 placeholder="••••••••"
                 value={password}
@@ -60,7 +71,7 @@ export default function LoginPage() {
                 className="absolute right-3 top-3 text-xs text-zinc-500 cursor-pointer"
                 onClick={() => setShowPwd(!showPwd)}
               >
-                {showPwd ? "ocultar" : "ver"}
+                {showPwd ? 'ocultar' : 'ver'}
               </span>
             </div>
           </div>
@@ -69,7 +80,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-blue-600 text-white py-2 rounded disabled:opacity-50"
           >
-            {loading ? "Ingresando..." : "Entrar"}
+            {loading ? 'Ingresando...' : 'Entrar'}
           </button>
         </form>
 
@@ -84,5 +95,13 @@ export default function LoginPage() {
         </footer>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageFallback />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

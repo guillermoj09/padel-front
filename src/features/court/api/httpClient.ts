@@ -6,46 +6,134 @@ import type {
   CalendarDayResponse,
   PaymentMethod,
   PaymentStatus,
+  BookingStatus,
 } from './types';
+import { isRecord } from '@/lib/errors';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '/api';
 
+type ApiRow = Record<string, unknown>;
+
+function toErrorMessage(data: unknown, fallback: string): string {
+  if (!isRecord(data)) return fallback;
+
+  const message = data.message;
+  if (typeof message === 'string' && message.trim()) {
+    return message;
+  }
+
+  return fallback;
+}
+
 async function handle<T>(res: Response): Promise<T> {
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as any)?.message || res.statusText);
+  const data: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(toErrorMessage(data, res.statusText));
+  }
   return data as T;
 }
 
 async function withConcurrency<T>(
-  tasks: (() => Promise<T>)[],
+  tasks: Array<() => Promise<T>>,
   limit = 6,
 ): Promise<T[]> {
-  const res: T[] = [];
-  let i = 0;
+  const result: T[] = [];
+  let index = 0;
+
   const workers = Array.from(
     { length: Math.min(limit, tasks.length) },
     async () => {
-      while (i < tasks.length) {
-        const idx = i++;
-        res[idx] = await tasks[idx]();
+      while (index < tasks.length) {
+        const currentIndex = index;
+        index += 1;
+        result[currentIndex] = await tasks[currentIndex]();
       }
     },
   );
+
   await Promise.all(workers);
-  return res;
+  return result;
+}
+
+function readString(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return fallback;
+}
+
+function readOptionalString(value: unknown): string | null {
+  const normalized = readString(value, '');
+  return normalized ? normalized : null;
+}
+
+function readStatus(value: unknown): BookingStatus {
+  const normalized = readString(value, 'reservado');
+
+  if (normalized === 'pendiente') return 'reservado';
+  if (
+    normalized === 'reservado' ||
+    normalized === 'confirmado' ||
+    normalized === 'pending' ||
+    normalized === 'confirmed' ||
+    normalized === 'cancelled'
+  ) {
+    return normalized;
+  }
+
+  return 'reservado';
+}
+
+function readPaymentMethod(value: unknown): PaymentMethod {
+  const normalized = readString(value, 'pendiente');
+
+  if (
+    normalized === 'pendiente' ||
+    normalized === 'transferencia' ||
+    normalized === 'efectivo' ||
+    normalized === 'tarjeta'
+  ) {
+    return normalized;
+  }
+
+  return 'pendiente';
+}
+
+function readPaymentStatus(value: unknown): PaymentStatus {
+  const normalized = readString(value, 'pending');
+  return normalized === 'paid' ? 'paid' : 'pending';
+}
+
+function mapCourt(row: ApiRow): CourtDTO {
+  return {
+    id: readString(row.id),
+    title: readString(row.title ?? row.name ?? row.id),
+    type: readString(row.type),
+  };
+}
+
+function mapBooking(row: ApiRow, courtId: string): BookingDTO {
+  return {
+    id: readString(row.id),
+    courtId: readString(row.courtId ?? row.court_id ?? courtId),
+    title: readString(row.title, 'Reserva'),
+    status: readStatus(row.status),
+    phoneNumber: readString(row.phoneNumber ?? row.contactPhone, ''),
+    startTime: new Date(readString(row.startTime ?? row.start_time)).toISOString(),
+    endTime: new Date(readString(row.endTime ?? row.end_time)).toISOString(),
+    paymentMethod: readPaymentMethod(row.paymentMethod ?? row.payment_method),
+    paymentStatus: readPaymentStatus(row.paymentStatus ?? row.payment_status),
+    paidAt: readOptionalString(row.paidAt ?? row.paid_at),
+    paymentConfirmedBy: readOptionalString(
+      row.paymentConfirmedBy ?? row.payment_confirmed_by,
+    ),
+  };
 }
 
 export const httpClient: CourtApi = {
   async listCourts(): Promise<CourtDTO[]> {
     const res = await fetch(`${API_BASE}/courts`, { credentials: 'include' });
-
-    const data = await handle<any[]>(res);
-    console.log('canchas:', JSON.stringify(data, null, 2));
-    return data.map((c) => ({
-      id: String(c.id),
-      title: String(c.title ?? c.name ?? c.id),
-      type: String(c.type),
-    }));
+    const data = await handle<ApiRow[]>(res);
+    return data.map(mapCourt);
   },
 
   async listBookingsByDay({ date, courtIds }): Promise<BookingDTO[]> {
@@ -56,24 +144,13 @@ export const httpClient: CourtApi = {
     if (!ids.length) return [];
 
     const tasks = ids.map((id) => async () => {
-      const url = `${API_BASE}/bookings/court/${encodeURIComponent(id)}/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
-      const r = await fetch(url, { credentials: 'include' });
-      const rows = await handle<any[]>(r);
+      const url = `${API_BASE}/bookings/court/${encodeURIComponent(
+        id,
+      )}/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+      const res = await fetch(url, { credentials: 'include' });
+      const rows = await handle<ApiRow[]>(res);
 
-      return rows.map((b) => ({
-        id: String(b.id),
-        courtId: String(b.courtId ?? b.court_id ?? id),
-        title: String(b.title ?? 'Reserva'),
-        status: (b.status === 'pendiente' ? 'reservado' : b.status) as BookingDTO['status'],
-        phoneNumber: String(b.phoneNumber ?? b.contactPhone ?? ''),
-        startTime: new Date(b.startTime ?? b.start_time).toISOString(),
-        endTime: new Date(b.endTime ?? b.end_time).toISOString(),
-        paymentMethod: (b.paymentMethod ?? b.payment_method ?? 'pendiente') as PaymentMethod,
-        paymentStatus: (b.paymentStatus ?? b.payment_status ?? 'pending') as PaymentStatus,
-        paidAt: b.paidAt ?? b.paid_at ?? null,
-        paymentConfirmedBy:
-          b.paymentConfirmedBy ?? b.payment_confirmed_by ?? null,
-      })) as BookingDTO[];
+      return rows.map((row) => mapBooking(row, id));
     });
 
     const perCourt = await withConcurrency(tasks, 6);
@@ -84,9 +161,8 @@ export const httpClient: CourtApi = {
     const courts = await this.listCourts();
     const bookings = await this.listBookingsByDay({
       date,
-      courtIds: courts.map((c) => c.id),
+      courtIds: courts.map((court) => court.id),
     });
-    console.log('bookings http:', JSON.stringify(bookings, null, 2));
 
     return { courts, bookings };
   },
