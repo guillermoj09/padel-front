@@ -1,16 +1,15 @@
-'use client';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { getTokenClient } from '@/lib/auth.service';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
-export default function Home() {
-  const router = useRouter();
+const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || 'access_token';
 
-  useEffect(() => {
-    const token = getTokenClient();
-    if (!token) router.replace('/login');
-    else router.replace('/canchas'); // tu dashboard
-  }, [router]);
+export default async function HomePage() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
 
-  return null;
+  if (token) {
+    redirect('/canchas');
+  }
+
+  redirect('/login');
 }

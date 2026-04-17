@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AuthMeResponse, AuthUser } from '@/features/auth/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3002';
-
 export function useSession() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -12,8 +10,10 @@ export function useSession() {
 
     async function load() {
       try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
-          credentials: 'include',
+        const res = await fetch('/api/session', {
+          method: 'GET',
+          cache: 'no-store',
+          credentials: 'same-origin',
         });
 
         if (!res.ok) {
@@ -23,7 +23,7 @@ export function useSession() {
 
         const data = (await res.json()) as AuthMeResponse;
         if (active) {
-          setUser(data.user);
+          setUser(data.user ?? null);
         }
       } catch {
         if (active) setUser(null);

@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { getErrorMessage } from '@/lib/errors';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3002';
-
 export function useLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,25 +12,24 @@ export function useLogin() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
-      if (!res.ok) {
-        let msg = `Error: ${res.status}`;
-        try {
-          const payload = (await res.json()) as { message?: string };
-          msg = payload.message || msg;
-        } catch {
-          // noop
-        }
-        throw new Error(msg);
+      let payload: { message?: string } | null = null;
+      try {
+        payload = (await res.json()) as { message?: string };
+      } catch {
+        // noop
       }
 
-      window.location.replace(next);
+      if (!res.ok) {
+        throw new Error(payload?.message || `Error: ${res.status}`);
+      }
+
+      window.location.replace(next || '/canchas');
     } catch (error: unknown) {
       setError(getErrorMessage(error, 'Error desconocido'));
     } finally {

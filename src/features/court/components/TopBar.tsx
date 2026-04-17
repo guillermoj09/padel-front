@@ -4,19 +4,13 @@ import { useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useUser } from '@/features/auth/UserProvider';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3002';
-
 export default function TopBar() {
   const pathname = usePathname();
   const user = useUser();
   const [loadingOut, setLoadingOut] = useState(false);
 
   const isAuthPage = useMemo(() => {
-    return (
-      pathname === '/login' ||
-      pathname === '/auth/new-account' ||
-      pathname.startsWith('/auth/')
-    );
+    return pathname === '/login' || pathname.startsWith('/auth/');
   }, [pathname]);
 
   const name = useMemo(() => {
@@ -24,16 +18,17 @@ export default function TopBar() {
       return 'Usuario';
     }
 
-    const base = user.email.split('@')[0];
+    const base = user.email.split('@')[0] || 'Usuario';
     return base.charAt(0).toUpperCase() + base.slice(1);
   }, [user?.email]);
 
   async function handleLogout() {
+    if (loadingOut) return;
+
     setLoadingOut(true);
     try {
-      await fetch(`${API_BASE}/auth/logout`, {
+      await fetch('/api/auth/logout', {
         method: 'POST',
-        credentials: 'include',
       });
       window.location.replace('/login');
     } finally {
@@ -59,7 +54,6 @@ export default function TopBar() {
     >
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 600, color: '#111827' }}>Hola, {name}</div>
-
         {typeof user.email === 'string' && (
           <div style={{ fontSize: 12, color: '#6b7280' }}>{user.email}</div>
         )}
