@@ -1,13 +1,14 @@
-'use client';
+"use client";
 
-
-// Importa tu componente exacto (ruta que mencionaste)
-import CanchaCalendarRBC from '@/features/court/components/CanchaCalendarRBC';
+import ProtectedShell from "@/features/auth/ProtectedShell";
+import CanchaCalendarPanel from "@/features/court/components/CanchaCalendarPanel";
 
 export default function CanchasPage() {
   return (
-    <div className="p-4">
-      <CanchaCalendarRBC dataSource="api" />
-    </div>
+    <ProtectedShell>
+      <div className="p-4">
+        <CanchaCalendarPanel dataSource="api" />
+      </div>
+    </ProtectedShell>
   );
 }

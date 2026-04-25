@@ -1,19 +1,23 @@
+@import "react-big-calendar/lib/css/react-big-calendar.css";
+@import "react-calendar/dist/Calendar.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import 'react-big-calendar/lib/css/react-big-calendar.css';
 
-html, body {
+html,
+body {
   overflow: visible;
 }
 
-/* 🔧 Animaciones personalizadas */
+/* Animaciones personalizadas */
 @layer utilities {
   @keyframes fade-in {
     from {
       opacity: 0;
       transform: scale(0.95);
     }
+
     to {
       opacity: 1;
       transform: scale(1);
@@ -25,7 +29,7 @@ html, body {
   }
 }
 
-/* ✅ Esta regla va FUERA de cualquier @layer */
+/* Regla global para FullCalendar */
 .fc .fc-timegrid-slot {
   height: 60px !important;
 }

@@ -4,31 +4,31 @@ import React, { useMemo } from "react";
 import {
   Calendar,
   dateFnsLocalizer,
-  EventPropGetter,
-  SlotInfo,
-  View,
+  type EventPropGetter,
+  type SlotInfo,
+  type View,
   Views,
 } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { es } from "date-fns/locale/es";
-import "react-big-calendar/lib/css/react-big-calendar.css";
 
-/**
- * Evento usado por React Big Calendar.
- *
- * Mantén start y end como Date antes de pasarlos al calendario.
- * Si tu backend devuelve fechas como string, conviértelas antes o deja
- * que este componente las convierta cuando sea posible.
- */
 export type CanchaCalendarEvent = {
   id: string | number;
   title: string;
-  start: Date;
-  end: Date;
+  start: Date | string;
+  end: Date | string;
   estado?: "disponible" | "reservada" | "bloqueada" | "cancelada" | string;
   canchaId?: string | number;
   cliente?: string;
   raw?: unknown;
+};
+
+export type NormalizedCanchaCalendarEvent = Omit<
+  CanchaCalendarEvent,
+  "start" | "end"
+> & {
+  start: Date;
+  end: Date;
 };
 
 type CalendarSlot = {
@@ -39,20 +39,12 @@ type CalendarSlot = {
 };
 
 export type CanchaCalendarRBCProps = {
-  /**
-   * Tu componente padre está usando:
-   * <CanchaCalendarRBC dataSource="api" />
-   *
-   * Por eso esta prop debe existir aunque, por ahora, el calendario
-   * no haga fetch automático aquí.
-   */
   dataSource?: "api" | "local" | string;
-
   events?: CanchaCalendarEvent[];
   defaultDate?: Date;
   defaultView?: View;
   height?: number | string;
-  onSelectEvent?: (event: CanchaCalendarEvent) => void;
+  onSelectEvent?: (event: NormalizedCanchaCalendarEvent) => void;
   onSelectSlot?: (slot: CalendarSlot) => void;
 };
 
@@ -68,7 +60,7 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-function getEventColor(estado?: CanchaCalendarEvent["estado"]): string {
+function getEventColor(estado?: NormalizedCanchaCalendarEvent["estado"]): string {
   switch (estado) {
     case "disponible":
       return "#16a34a";
@@ -83,6 +75,10 @@ function getEventColor(estado?: CanchaCalendarEvent["estado"]): string {
   }
 }
 
+function toDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
 export default function CanchaCalendarRBC({
   dataSource = "local",
   events = [],
@@ -92,22 +88,19 @@ export default function CanchaCalendarRBC({
   onSelectEvent,
   onSelectSlot,
 }: CanchaCalendarRBCProps) {
-  /**
-   * dataSource queda aceptado para mantener compatibilidad con el componente padre.
-   * Si luego quieres que este componente cargue reservas desde API,
-   * aquí se puede agregar un useEffect con fetch/axios.
-   */
   void dataSource;
 
-  const calendarEvents = useMemo<CanchaCalendarEvent[]>(() => {
+  const calendarEvents = useMemo<NormalizedCanchaCalendarEvent[]>(() => {
     return events.map((event) => ({
       ...event,
-      start: event.start instanceof Date ? event.start : new Date(event.start),
-      end: event.end instanceof Date ? event.end : new Date(event.end),
+      start: toDate(event.start),
+      end: toDate(event.end),
     }));
   }, [events]);
 
-  const eventPropGetter: EventPropGetter<CanchaCalendarEvent> = (event) => {
+  const eventPropGetter: EventPropGetter<NormalizedCanchaCalendarEvent> = (
+    event,
+  ) => {
     const backgroundColor = getEventColor(event.estado);
 
     return {
@@ -122,7 +115,7 @@ export default function CanchaCalendarRBC({
     };
   };
 
-  const handleSelectEvent = (event: CanchaCalendarEvent) => {
+  const handleSelectEvent = (event: NormalizedCanchaCalendarEvent) => {
     onSelectEvent?.(event);
   };
 
@@ -137,7 +130,7 @@ export default function CanchaCalendarRBC({
 
   return (
     <div style={{ height }}>
-      <Calendar<CanchaCalendarEvent>
+      <Calendar<NormalizedCanchaCalendarEvent>
         localizer={localizer}
         events={calendarEvents}
         startAccessor="start"

@@ -1,15 +1,13 @@
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
-
-const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || 'access_token';
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 export default async function HomePage() {
   const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
+  const token = cookieStore.get("access_token")?.value;
 
   if (token) {
-    redirect('/canchas');
+    redirect("/canchas");
   }
 
-  redirect('/login');
+  redirect("/login");
 }
