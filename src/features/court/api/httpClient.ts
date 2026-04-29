@@ -14,6 +14,40 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '/api';
 
 type ApiRow = Record<string, unknown>;
 
+type ApiCalendarRow = {
+  id: string;
+  rawId?: string | number;
+  title?: string;
+  start: string;
+  end: string;
+  estado?: 'reservada' | 'bloqueada' | 'cancelada' | string;
+  status?: string;
+  canchaId?: string | number;
+  courtId?: string | number;
+  court_id?: string | number;
+  resourceId?: string | number;
+  type?: 'booking' | 'court_block' | string;
+  raw?: unknown;
+  paymentMethod?: string;
+  payment_method?: string;
+  paymentStatus?: string;
+  payment_status?: string;
+  paidAt?: string | null;
+  paid_at?: string | null;
+  paymentConfirmedBy?: string | null;
+  payment_confirmed_by?: string | null;
+  phoneNumber?: string;
+  contactPhone?: string;
+};
+
+type CalendarBookingDTO = BookingDTO & {
+  estado?: string;
+  resourceId?: string;
+  canchaId?: string;
+  type?: string;
+  raw?: unknown;
+};
+
 function toErrorMessage(data: unknown, fallback: string): string {
   if (!isRecord(data)) return fallback;
 
@@ -70,14 +104,18 @@ function readStatus(value: unknown): BookingStatus {
   const normalized = readString(value, 'reservado');
 
   if (normalized === 'pendiente') return 'reservado';
+
   if (
     normalized === 'reservado' ||
     normalized === 'confirmado' ||
     normalized === 'pending' ||
     normalized === 'confirmed' ||
-    normalized === 'cancelled'
+    normalized === 'cancelled' ||
+    normalized === 'reservada' ||
+    normalized === 'bloqueada' ||
+    normalized === 'cancelada'
   ) {
-    return normalized;
+    return normalized as BookingStatus;
   }
 
   return 'reservado';
@@ -118,7 +156,9 @@ function mapBooking(row: ApiRow, courtId: string): BookingDTO {
     title: readString(row.title, 'Reserva'),
     status: readStatus(row.status),
     phoneNumber: readString(row.phoneNumber ?? row.contactPhone, ''),
-    startTime: new Date(readString(row.startTime ?? row.start_time)).toISOString(),
+    startTime: new Date(
+      readString(row.startTime ?? row.start_time),
+    ).toISOString(),
     endTime: new Date(readString(row.endTime ?? row.end_time)).toISOString(),
     paymentMethod: readPaymentMethod(row.paymentMethod ?? row.payment_method),
     paymentStatus: readPaymentStatus(row.paymentStatus ?? row.payment_status),
@@ -126,6 +166,42 @@ function mapBooking(row: ApiRow, courtId: string): BookingDTO {
     paymentConfirmedBy: readOptionalString(
       row.paymentConfirmedBy ?? row.payment_confirmed_by,
     ),
+  };
+}
+
+function mapCalendarEvent(
+  row: ApiCalendarRow,
+  fallbackCourtId: string,
+): CalendarBookingDTO {
+  const courtId = readString(
+    row.resourceId ?? row.canchaId ?? row.courtId ?? row.court_id,
+    fallbackCourtId,
+  );
+
+  const estado = readString(row.estado ?? row.status, 'reservada');
+
+  return {
+    id: readString(row.id),
+    courtId,
+    canchaId: courtId,
+    resourceId: courtId,
+    title: readString(
+      row.title,
+      estado === 'bloqueada' ? 'Cancha bloqueada' : 'Reserva',
+    ),
+    status: readStatus(estado),
+    estado,
+    type: readString(row.type),
+    phoneNumber: readString(row.phoneNumber ?? row.contactPhone, ''),
+    startTime: new Date(readString(row.start)).toISOString(),
+    endTime: new Date(readString(row.end)).toISOString(),
+    paymentMethod: readPaymentMethod(row.paymentMethod ?? row.payment_method),
+    paymentStatus: readPaymentStatus(row.paymentStatus ?? row.payment_status),
+    paidAt: readOptionalString(row.paidAt ?? row.paid_at),
+    paymentConfirmedBy: readOptionalString(
+      row.paymentConfirmedBy ?? row.payment_confirmed_by,
+    ),
+    raw: row.raw ?? row,
   };
 }
 
@@ -146,11 +222,14 @@ export const httpClient: CourtApi = {
     const tasks = ids.map((id) => async () => {
       const url = `${API_BASE}/bookings/court/${encodeURIComponent(
         id,
-      )}/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
-      const res = await fetch(url, { credentials: 'include' });
-      const rows = await handle<ApiRow[]>(res);
+      )}/calendar?from=${encodeURIComponent(start)}&to=${encodeURIComponent(
+        end,
+      )}`;
 
-      return rows.map((row) => mapBooking(row, id));
+      const res = await fetch(url, { credentials: 'include' });
+      const rows = await handle<ApiCalendarRow[]>(res);
+
+      return rows.map((row) => mapCalendarEvent(row, id));
     });
 
     const perCourt = await withConcurrency(tasks, 6);

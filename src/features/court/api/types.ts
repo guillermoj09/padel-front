@@ -4,7 +4,8 @@ export type BookingStatus =
   | 'confirmado'
   | 'pending'
   | 'confirmed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'bloqueado';
 
 export type PaymentMethod =
   | 'pendiente'
