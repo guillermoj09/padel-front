@@ -37,7 +37,7 @@ export function ReservationInfoModal({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pendiente');
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState('');
-
+  console.log( "event ", event );
   useEffect(() => {
     if (!event) return;
     setPaymentMethod(event.paymentMethod ?? 'pendiente');
@@ -69,7 +69,7 @@ export function ReservationInfoModal({
 
     setIsConfirmingPayment(true);
     setPaymentMessage('');
-
+    console.log( "event.id ", event.id );
     try {
       const data = await confirmBookingPayment(event.id, paymentMethod);
       const paidAt = data?.paidAt ?? new Date().toISOString();
@@ -89,6 +89,7 @@ export function ReservationInfoModal({
       setIsConfirmingPayment(false);
     }
   }
+
 
   return (
     <div

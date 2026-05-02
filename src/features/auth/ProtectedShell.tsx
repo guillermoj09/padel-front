@@ -7,8 +7,10 @@ import TopBar from "@/features/court/components/TopBar";
 export default function ProtectedShell({ children }: { children: ReactNode }) {
   return (
     <UserProvider>
-      <TopBar />
-      {children}
+      <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-zinc-50">
+        <TopBar />
+        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      </div>
     </UserProvider>
   );
 }

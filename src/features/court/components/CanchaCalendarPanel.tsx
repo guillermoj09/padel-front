@@ -8,7 +8,7 @@ const CanchaCalendarRBC = dynamic<CanchaCalendarRBCProps>(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[650px] items-center justify-center rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
+      <div className="flex h-full min-h-[520px] items-center justify-center rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
         Cargando calendario...
       </div>
     ),

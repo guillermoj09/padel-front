@@ -7,10 +7,13 @@
 
 html,
 body {
-  overflow: visible;
+  min-height: 100%;
 }
 
-/* Animaciones personalizadas */
+body {
+  margin: 0;
+}
+
 @layer utilities {
   @keyframes fade-in {
     from {
@@ -29,7 +32,56 @@ body {
   }
 }
 
-/* Regla global para FullCalendar */
 .fc .fc-timegrid-slot {
   height: 60px !important;
+}
+
+/*
+  Solo la grilla horaria de React Big Calendar debe scrollear.
+  El toolbar superior y el encabezado de recursos quedan fijos.
+*/
+.booking-calendar-shell,
+.booking-calendar-shell .rbc-calendar {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.booking-calendar-shell .rbc-calendar {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.booking-calendar-shell .rbc-toolbar {
+  flex: 0 0 auto !important;
+}
+
+.booking-calendar-shell .rbc-time-view {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.booking-calendar-shell .rbc-time-header {
+  flex: 0 0 auto !important;
+  overflow: hidden !important;
+}
+
+.booking-calendar-shell .rbc-time-content {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+}
+
+.booking-calendar-shell .rbc-time-content > .rbc-time-gutter,
+.booking-calendar-shell .rbc-time-content > .rbc-day-slot,
+.booking-calendar-shell .rbc-time-content > .rbc-time-column {
+  min-height: 0 !important;
+}
+
+.booking-calendar-shell .rbc-timeslot-group {
+  min-height: 48px !important;
 }

@@ -271,10 +271,10 @@ function isPaidEvent(event?: CalendarEvent | null): boolean {
 
   const paymentStatus = normalizePaymentStatus(
     eventWithPayment.paymentStatus ??
-      eventWithPayment.payment_status ??
-      eventWithPayment.raw?.paymentStatus ??
-      eventWithPayment.raw?.payment_status ??
-      null,
+    eventWithPayment.payment_status ??
+    eventWithPayment.raw?.paymentStatus ??
+    eventWithPayment.raw?.payment_status ??
+    null,
   );
 
   if (paymentStatus === 'paid') return true;
@@ -291,9 +291,9 @@ const STATUS_STYLES = {
   },
   confirmed: {
     label: 'Confirmada',
-    backgroundColor: '#2563EB',
-    borderColor: '#1D4ED8',
-    color: '#FFFFFF',
+    backgroundColor: '#eef2ff', // indigo-50, azul índigo muy claro
+    borderColor: '#c7d2fe',     // indigo-200, borde más marcado
+    color: '#3730a3',           // indigo-800, texto fuerte
   },
   paid: {
     label: 'Pagada',
@@ -438,6 +438,7 @@ const CANCELABLE_STATES = new Set<NormalizedEstado>(['pending', 'reserved', 'con
 // ==========================
 
 // Pádel: bloques de 1h30
+// Se mantiene la secuencia original y solo se agregan horarios al final.
 const PADEL_ALLOWED_SLOTS = [
   { h: 7, m: 0 },
   { h: 8, m: 30 },
@@ -680,6 +681,12 @@ export default function CanchaCalendarRBC({
       return closing;
     }
 
+    if (isPadelType(type)) {
+      closing.setDate(closing.getDate() + 1);
+      closing.setHours(0, 0, 0, 0);
+      return closing;
+    }
+
     closing.setHours(23, 0, 0, 0);
     return closing;
   };
@@ -907,7 +914,7 @@ export default function CanchaCalendarRBC({
 
   if (!mounted) {
     return (
-      <div className="h-[80vh] font-[system-ui]">
+      <div className="h-[calc(100dvh-2rem)] min-h-0 font-[system-ui]">
         <div className="h-full rounded-2xl bg-white shadow-sm border border-zinc-200 flex items-center justify-center">
           <div className="text-sm text-zinc-500">Cargando calendario...</div>
         </div>
@@ -918,7 +925,7 @@ export default function CanchaCalendarRBC({
   const formattedDate = format(date, "EEEE d 'de' MMMM yyyy", { locale: es });
 
   return (
-    <div className="h-[80vh] font-[system-ui]">
+    <div className="h-[calc(100dvh-2rem)] min-h-0 font-[system-ui]">
       <div className="h-full rounded-2xl bg-white shadow-sm border border-zinc-200 flex flex-col">
         <header className="flex flex-col gap-3 border-b border-zinc-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -948,108 +955,51 @@ export default function CanchaCalendarRBC({
           </div>
         ) : (
           <div className="flex-1 grid grid-cols-[260px,1fr] gap-4 p-4 overflow-hidden">
-          <aside className="h-full flex flex-col gap-3">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-2">
-              <Calendar
-                locale="es"
-                calendarType="iso8601"
-                value={date}
-                onChange={(value) => {
-                  const picked = Array.isArray(value) ? value[0] : value;
-                  if (!(picked instanceof Date)) return;
+            <aside className="h-full flex flex-col gap-3">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-2">
+                <Calendar
+                  locale="es"
+                  calendarType="iso8601"
+                  value={date}
+                  onChange={(value) => {
+                    const picked = Array.isArray(value) ? value[0] : value;
+                    if (!(picked instanceof Date)) return;
 
-                  setDate(picked);
-                }}
-                next2Label={null}
-                prev2Label={null}
-              />
-            </div>
-
-            <div className="rounded-xl border border-zinc-200 bg-white p-3 flex-1 flex flex-col gap-3">
-              <span className="text-xs font-medium text-zinc-700">
-                Canchas visibles
-              </span>
-
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setSelected(courts.map((r) => String(r.id)))}
-                  className="px-2 py-1 text-xs border rounded bg-zinc-50"
-                >
-                  Todas
-                </button>
-                <button
-                  onClick={() => setSelected([])}
-                  className="px-2 py-1 text-xs border rounded bg-zinc-50"
-                >
-                  Ninguna
-                </button>
+                    setDate(picked);
+                  }}
+                  next2Label={null}
+                  prev2Label={null}
+                />
               </div>
 
-              <div className="flex-1 overflow-auto flex flex-col gap-4">
-                <div>
-                  <p className="text-[11px] font-semibold text-zinc-500 uppercase mb-2">
-                    Pádel
-                  </p>
+              <div className="rounded-xl border border-zinc-200 bg-white p-3 flex-1 flex flex-col gap-3">
+                <span className="text-xs font-medium text-zinc-700">
+                  Canchas visibles
+                </span>
 
-                  <div className="flex flex-col gap-1">
-                    {padelCourts.map((r) => (
-                      <label
-                        key={String(r.id)}
-                        className="flex items-center gap-1 text-xs cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(String(r.id))}
-                          onChange={() => {
-                            setSelected((prev) =>
-                              prev.includes(String(r.id))
-                                ? prev.filter((x) => x !== String(r.id))
-                                : [...prev, String(r.id)]
-                            );
-                          }}
-                        />
-                        <span>{r.title}</span>
-                      </label>
-                    ))}
-                  </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setSelected(courts.map((r) => String(r.id)))}
+                    className="px-2 py-1 text-xs border rounded bg-zinc-50"
+                  >
+                    Todas
+                  </button>
+                  <button
+                    onClick={() => setSelected([])}
+                    className="px-2 py-1 text-xs border rounded bg-zinc-50"
+                  >
+                    Ninguna
+                  </button>
                 </div>
 
-                <div>
-                  <p className="text-[11px] font-semibold text-zinc-500 uppercase mb-2">
-                    Fútbol
-                  </p>
-
-                  <div className="flex flex-col gap-1">
-                    {futbolCourts.map((r) => (
-                      <label
-                        key={String(r.id)}
-                        className="flex items-center gap-1 text-xs cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(String(r.id))}
-                          onChange={() => {
-                            setSelected((prev) =>
-                              prev.includes(String(r.id))
-                                ? prev.filter((x) => x !== String(r.id))
-                                : [...prev, String(r.id)]
-                            );
-                          }}
-                        />
-                        <span>{r.title}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {otherCourts.length > 0 && (
+                <div className="flex-1 overflow-auto flex flex-col gap-4">
                   <div>
                     <p className="text-[11px] font-semibold text-zinc-500 uppercase mb-2">
-                      Otras
+                      Pádel
                     </p>
 
                     <div className="flex flex-col gap-1">
-                      {otherCourts.map((r) => (
+                      {padelCourts.map((r) => (
                         <label
                           key={String(r.id)}
                           className="flex items-center gap-1 text-xs cursor-pointer"
@@ -1070,94 +1020,154 @@ export default function CanchaCalendarRBC({
                       ))}
                     </div>
                   </div>
-                )}
+
+                  <div>
+                    <p className="text-[11px] font-semibold text-zinc-500 uppercase mb-2">
+                      Fútbol
+                    </p>
+
+                    <div className="flex flex-col gap-1">
+                      {futbolCourts.map((r) => (
+                        <label
+                          key={String(r.id)}
+                          className="flex items-center gap-1 text-xs cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(String(r.id))}
+                            onChange={() => {
+                              setSelected((prev) =>
+                                prev.includes(String(r.id))
+                                  ? prev.filter((x) => x !== String(r.id))
+                                  : [...prev, String(r.id)]
+                              );
+                            }}
+                          />
+                          <span>{r.title}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {otherCourts.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-zinc-500 uppercase mb-2">
+                        Otras
+                      </p>
+
+                      <div className="flex flex-col gap-1">
+                        {otherCourts.map((r) => (
+                          <label
+                            key={String(r.id)}
+                            className="flex items-center gap-1 text-xs cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected.includes(String(r.id))}
+                              onChange={() => {
+                                setSelected((prev) =>
+                                  prev.includes(String(r.id))
+                                    ? prev.filter((x) => x !== String(r.id))
+                                    : [...prev, String(r.id)]
+                                );
+                              }}
+                            />
+                            <span>{r.title}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </aside>
+            </aside>
 
-          <section
-            className="h-full overflow-hidden rounded-xl border border-zinc-200 bg-white"
-            onMouseMove={rememberPointerPosition}
-            onMouseDown={rememberPointerPosition}
-            onClickCapture={rememberPointerPosition}
-          >
-            <div className="h-full overflow-x-auto">
-              <div style={{ minWidth: minWidthPx }}>
-                <RBCalendar
-                  localizer={localizer}
-                  culture="es"
-                  date={date}
-                  onNavigate={(next) => {
-                    setDate(next);
-                  }}
-                  view={view}
-                  onView={(nextView) => setView(nextView)}
-                  defaultView={Views.DAY}
-                  views={[Views.DAY, Views.WEEK]}
-                  step={30}
-                  timeslots={1}
-                  min={new Date(1970, 0, 1, 7)}
-                  max={new Date(1970, 0, 1, 23, 59, 59, 999)}
-                  events={events}
-                  eventPropGetter={eventPropGetter}
-                  resources={resources}
-                  resourceIdAccessor="id"
-                  resourceTitleAccessor="title"
-                  selectable
-                  onSelecting={(range) => {
-                    const resourceId = getSlotCourtId(
-                      (range as { resourceId?: string | number }).resourceId,
-                    );
-                    const start = getCalendarDateForSlot(range.start);
-                    const end = getReservationEndByCourt(start, resourceId);
+            <section
+              className="booking-calendar-shell h-full min-h-0 overflow-hidden rounded-xl border border-zinc-200 bg-white"
+              onMouseMove={rememberPointerPosition}
+              onMouseDown={rememberPointerPosition}
+              onClickCapture={rememberPointerPosition}
+            >
+              <div className="h-full min-h-0 overflow-x-auto overflow-y-hidden">
+                <div className="h-full min-h-0" style={{ minWidth: minWidthPx }}>
+                  <RBCalendar
+                    style={{ height: '100%' }}
+                    scrollToTime={new Date(1970, 0, 1, 7, 0, 0, 0)}
+                    enableAutoScroll={false}
+                    localizer={localizer}
+                    culture="es"
+                    date={date}
+                    onNavigate={(next) => {
+                      setDate(next);
+                    }}
+                    view={view}
+                    onView={(nextView) => setView(nextView)}
+                    defaultView={Views.DAY}
+                    views={[Views.DAY, Views.WEEK]}
+                    step={30}
+                    timeslots={1}
+                    min={new Date(1970, 0, 1, 7)}
+                    max={new Date(1970, 0, 1, 23, 59, 59, 999)}
+                    events={events}
+                    eventPropGetter={eventPropGetter}
+                    resources={resources}
+                    resourceIdAccessor="id"
+                    resourceTitleAccessor="title"
+                    selectable
+                    onSelecting={(range) => {
+                      const resourceId = getSlotCourtId(
+                        (range as { resourceId?: string | number }).resourceId,
+                      );
+                      const start = getCalendarDateForSlot(range.start);
+                      const end = getReservationEndByCourt(start, resourceId);
 
-                    return !validateReservationDateTime({
-                      courtId: resourceId,
-                      start,
-                      end,
-                    });
-                  }}
-                  onSelectSlot={handleSelectSlot}
-                  onSelectEvent={handleSelectEvent}
-                  dayPropGetter={() => ({
-                    style: {
-                      backgroundColor: '#ffffff',
-                    },
-                  })}
-                  slotPropGetter={(slotDate, resourceId) => {
-                    const slotStart = getCalendarDateForSlot(slotDate);
-                    const isFutureSlot =
-                      isSameOrAfterToday(slotStart) &&
-                      isSameOrAfterCurrentBusinessMinute(slotStart);
+                      return !validateReservationDateTime({
+                        courtId: resourceId,
+                        start,
+                        end,
+                      });
+                    }}
+                    onSelectSlot={handleSelectSlot}
+                    onSelectEvent={handleSelectEvent}
+                    dayPropGetter={() => ({
+                      style: {
+                        backgroundColor: '#ffffff',
+                      },
+                    })}
+                    slotPropGetter={(slotDate, resourceId) => {
+                      const slotStart = getCalendarDateForSlot(slotDate);
+                      const isFutureSlot =
+                        isSameOrAfterToday(slotStart) &&
+                        isSameOrAfterCurrentBusinessMinute(slotStart);
 
-                    if (resourceId === undefined || resourceId === null) {
+                      if (resourceId === undefined || resourceId === null) {
+                        return {
+                          style: {
+                            backgroundColor: isFutureSlot ? '#ffffff' : '#f3f4f6',
+                            opacity: 1,
+                          },
+                          className: isFutureSlot ? '' : 'cursor-not-allowed',
+                        };
+                      }
+
+                      const courtId = String(resourceId);
+                      const allowed =
+                        isFutureSlot && isAllowedTimeForCourt(slotStart, courtId);
+
                       return {
                         style: {
-                          backgroundColor: isFutureSlot ? '#ffffff' : '#f3f4f6',
+                          backgroundColor: allowed ? '#ffffff' : '#f3f4f6',
                           opacity: 1,
                         },
-                        className: isFutureSlot ? '' : 'cursor-not-allowed',
+                        className: allowed ? '' : 'cursor-not-allowed',
                       };
-                    }
-
-                    const courtId = String(resourceId);
-                    const allowed =
-                      isFutureSlot && isAllowedTimeForCourt(slotStart, courtId);
-
-                    return {
-                      style: {
-                        backgroundColor: allowed ? '#ffffff' : '#f3f4f6',
-                        opacity: 1,
-                      },
-                      className: allowed ? '' : 'cursor-not-allowed',
-                    };
-                  }}
-                  style={{ height: '100%' }}
-                  longPressThreshold={250}
-                />
+                    }}
+                    style={{ height: '100%' }}
+                    longPressThreshold={250}
+                  />
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
           </div>
         )}
       </div>
@@ -1183,7 +1193,7 @@ export default function CanchaCalendarRBC({
         courtTitle={
           selectedEvent
             ? courts.find((c) => String(c.id) === String(selectedEvent.resourceId))
-                ?.title
+              ?.title
             : undefined
         }
         canDelete={
@@ -1210,12 +1220,12 @@ export default function CanchaCalendarRBC({
           setSelectedEvent((prev) =>
             prev && String(prev.id) === bookingId
               ? {
-                  ...prev,
-                  paymentMethod: payload.paymentMethod,
-                  paymentStatus: payload.paymentStatus,
-                  paidAt: payload.paidAt,
-                  paymentConfirmedBy: payload.paymentConfirmedBy ?? null,
-                }
+                ...prev,
+                paymentMethod: payload.paymentMethod,
+                paymentStatus: payload.paymentStatus,
+                paidAt: payload.paidAt,
+                paymentConfirmedBy: payload.paymentConfirmedBy ?? null,
+              }
               : prev,
           );
 
@@ -1223,12 +1233,12 @@ export default function CanchaCalendarRBC({
             prev.map((item) =>
               String(item.id) === bookingId
                 ? {
-                    ...item,
-                    paymentMethod: payload.paymentMethod,
-                    paymentStatus: payload.paymentStatus,
-                    paidAt: payload.paidAt,
-                    paymentConfirmedBy: payload.paymentConfirmedBy ?? null,
-                  }
+                  ...item,
+                  paymentMethod: payload.paymentMethod,
+                  paymentStatus: payload.paymentStatus,
+                  paidAt: payload.paidAt,
+                  paymentConfirmedBy: payload.paymentConfirmedBy ?? null,
+                }
                 : item,
             ),
           );

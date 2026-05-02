@@ -68,7 +68,7 @@ export function useCalendarDay(params: {
               resourceId: booking.courtId,
               estado: booking.status,
               contactPhone: booking.phoneNumber,
-              paymentMethod: booking.paymentMethod ?? 'pendiente',
+              paymentMethod: booking.paymentMethod ?? 'transferencia',
               paymentStatus: booking.paymentStatus ?? 'pending',
               paidAt: booking.paidAt ?? null,
               paymentConfirmedBy: booking.paymentConfirmedBy ?? null,

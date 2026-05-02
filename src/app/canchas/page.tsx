@@ -6,9 +6,9 @@ import CanchaCalendarPanel from "@/features/court/components/CanchaCalendarPanel
 export default function CanchasPage() {
   return (
     <ProtectedShell>
-      <div className="p-4">
+      <main className="h-full min-h-0 overflow-hidden bg-zinc-50 p-2">
         <CanchaCalendarPanel dataSource="api" />
-      </div>
+      </main>
     </ProtectedShell>
   );
 }

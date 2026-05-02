@@ -47,8 +47,7 @@ export default function TopBar() {
         padding: '10px 14px',
         borderBottom: '1px solid #e5e7eb',
         background: '#fff',
-        position: 'sticky',
-        top: 0,
+        flexShrink: 0,
         zIndex: 40,
       }}
     >
